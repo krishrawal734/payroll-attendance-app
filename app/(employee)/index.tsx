@@ -235,39 +235,6 @@ export default function EmployeeDashboard() {
         )}
       </View>
 
-      {/* Push Notifications & Shift Reminders Card */}
-      <View className="bg-white rounded-2xl p-4 border border-slate-200 mb-6 shadow-xs">
-        <View className="flex-row items-center justify-between mb-2">
-          <View className="flex-row items-center">
-            <View className="w-8 h-8 rounded-lg bg-indigo-50 items-center justify-center mr-2.5">
-              <BellRing size={16} color="#4f46e5" />
-            </View>
-            <View>
-              <Text className="text-xs font-extrabold text-slate-900">Shift Reminders Active</Text>
-              <Text className="text-[11px] text-slate-500">9:00 AM Check-In & 7:00 PM Night Shift</Text>
-            </View>
-          </View>
-          <View className="bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-            <Text className="text-[10px] font-bold text-emerald-700">Scheduled</Text>
-          </View>
-        </View>
-
-        <View className="flex-row mt-2.5 pt-2.5 border-t border-slate-100 space-x-2">
-          <TouchableOpacity
-            className="flex-1 bg-indigo-50 py-2 rounded-xl items-center mr-2 border border-indigo-100"
-            onPress={() => notificationService.triggerTestReminder('night')}
-          >
-            <Text className="text-indigo-700 text-[11px] font-bold">🔔 Test 7 PM Alert</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className="flex-1 bg-slate-100 py-2 rounded-xl items-center"
-            onPress={() => notificationService.triggerTestReminder('leave')}
-          >
-            <Text className="text-slate-700 text-[11px] font-bold">🔔 Test Leave Alert</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       {/* Recent Attendance Logs */}
       <Text className="text-base font-extrabold text-slate-900 mb-3">Recent Attendance Logs</Text>
       <View className="bg-white rounded-2xl p-3 border border-slate-200">

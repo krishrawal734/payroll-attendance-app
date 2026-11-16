@@ -26,7 +26,7 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<Employee | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const isCloudMode = dataService.isCloud();
 
   useEffect(() => {
@@ -35,14 +35,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const stored = await AsyncStorage.getItem(USER_STORAGE_KEY);
         if (stored) {
           const parsed: Employee = JSON.parse(stored);
-          setUser(parsed);
-          db.setCurrentUser(parsed);
-        } else {
-          const currentUser = db.getCurrentUser();
-          if (currentUser) setUser(currentUser);
+          // If stored session is an obsolete demo mock ID (e.g. emp_admin_1), purge it for fresh cloud login
+          if (parsed.id && parsed.id.startsWith('emp_') && isCloudMode) {
+            await AsyncStorage.removeItem(USER_STORAGE_KEY);
+            setUser(null);
+          } else {
+            setUser(parsed);
+            db.setCurrentUser(parsed);
+          }
         }
       } catch (err) {
         console.warn('Failed to restore user session:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
     restoreSession();

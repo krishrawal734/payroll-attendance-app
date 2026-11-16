@@ -52,11 +52,7 @@ export default function LoginScreen() {
           <Text className="text-sm text-slate-500 mt-1 text-center">
             Employee Attendance & Payroll Platform
           </Text>
-          <View className="mt-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200">
-            <Text className="text-[11px] font-bold text-slate-600">
-              {isCloudMode ? '🟢 Supabase Cloud Active' : '🟡 Local Mode (Ready for Supabase)'}
-            </Text>
-          </View>
+         
         </View>
 
         {/* Login Card */}
@@ -72,7 +68,7 @@ export default function LoginScreen() {
             </View>
             <TextInput
               className="flex-1 px-3.5 py-3.5 text-base text-slate-900 font-semibold"
-              placeholder="e.g. 9811122233"
+              placeholder="Enter 10-digit number"
               placeholderTextColor="#94a3b8"
               keyboardType="phone-pad"
               maxLength={10}

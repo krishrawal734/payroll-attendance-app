@@ -270,39 +270,6 @@ export default function AdminDashboard() {
               <ChevronRight size={16} color="#94a3b8" />
             </TouchableOpacity>
           </View>
-
-          {/* Quick Notification Broadcast & Test */}
-          <View className="bg-white rounded-2xl p-4 border border-slate-200 mt-5 shadow-xs">
-            <View className="flex-row items-center justify-between mb-2">
-              <View className="flex-row items-center">
-                <View className="w-8 h-8 rounded-lg bg-indigo-50 items-center justify-center mr-2.5">
-                  <BellRing size={16} color="#4f46e5" />
-                </View>
-                <View>
-                  <Text className="text-xs font-extrabold text-slate-900">Push Notifications Center</Text>
-                  <Text className="text-[11px] text-slate-500">Test alerts and shift broadcast triggers</Text>
-                </View>
-              </View>
-              <View className="bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                <Text className="text-[10px] font-bold text-emerald-700">Active</Text>
-              </View>
-            </View>
-
-            <View className="flex-row mt-2.5 pt-2.5 border-t border-slate-100 space-x-2">
-              <TouchableOpacity
-                className="flex-1 bg-indigo-50 py-2 rounded-xl items-center mr-2 border border-indigo-100"
-                onPress={() => notificationService.triggerTestReminder('morning')}
-              >
-                <Text className="text-indigo-700 text-[11px] font-bold">🔔 Test 9 AM Check-In</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                className="flex-1 bg-slate-100 py-2 rounded-xl items-center"
-                onPress={() => notificationService.triggerTestReminder('advance')}
-              >
-                <Text className="text-slate-700 text-[11px] font-bold">🔔 Test Advance Alert</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </>
       )}
     </ScrollView>
