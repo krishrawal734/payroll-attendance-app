@@ -199,7 +199,35 @@ export default function AdminPayrollScreen() {
       ps,
       emp,
       () => setLoadingPdfId(ps.id),
-      () => setLoadingPdfId(null)
+      () => setLoadingPdfId(null),
+      async () => {
+        const res = await dataService.generatePayslip(emp.id, selectedMonth);
+        Alert.alert(res.success ? 'Payslip Recalculated' : 'Notice', res.message);
+        if (res.success) {
+          await loadData(selectedMonth);
+        }
+      },
+      async () => {
+        Alert.alert(
+          'Delete Payslip',
+          `Delete payslip for ${emp.fullName}? Status will reset back to Pending Slip.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: async () => {
+                const res = await dataService.deletePayslip(ps.id);
+                if (res.success) {
+                  await loadData(selectedMonth);
+                } else {
+                  Alert.alert('Error', res.message);
+                }
+              },
+            },
+          ]
+        );
+      }
     );
   };
 

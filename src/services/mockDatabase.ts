@@ -252,11 +252,6 @@ class MockDatabase {
     const emp = this.getEmployeeById(employeeId);
     if (!emp) return { success: false, message: 'Employee not found.' };
 
-    const existing = this.payslips.find((p) => p.employeeId === employeeId && p.monthYear === monthYear);
-    if (existing) {
-      return { success: true, payslip: existing, message: 'Payslip already generated for this month.' };
-    }
-
     const empAttendance = this.getAttendance(employeeId).filter((a) => a.date.startsWith(monthYear));
     const presentDays = empAttendance.filter((a) => a.status === 'PRESENT').length;
     const nightPresentDays = empAttendance.filter((a) => a.isNightPresent).length;
@@ -275,6 +270,25 @@ class MockDatabase {
     const finSummary = this.getEmployeeFinancialSummary(employeeId, monthYear);
     const advanceDeduction = Math.min(finSummary?.activeAdvanceBalance || 0, gross);
     const net = Math.max(0, gross - advanceDeduction);
+
+    const existingIdx = this.payslips.findIndex((p) => p.employeeId === employeeId && p.monthYear === monthYear);
+    if (existingIdx !== -1) {
+      this.payslips[existingIdx] = {
+        ...this.payslips[existingIdx],
+        presentDays,
+        nightPresentDays,
+        leavesTaken: leaves.length,
+        baseSalary: emp.baseSalary,
+        grossEarnings: gross,
+        advanceDeductions: advanceDeduction,
+        netPayable: net,
+      };
+      return {
+        success: true,
+        payslip: this.payslips[existingIdx],
+        message: `Payslip for ${monthYear} refreshed & updated successfully.`,
+      };
+    }
 
     const newPayslip: Payslip = {
       id: `ps_${Date.now()}`,
@@ -295,6 +309,13 @@ class MockDatabase {
 
     this.payslips.unshift(newPayslip);
     return { success: true, payslip: newPayslip, message: `Payslip for ${monthYear} generated successfully.` };
+  }
+
+  deletePayslip(id: string): { success: boolean; message: string } {
+    const idx = this.payslips.findIndex((p) => p.id === id);
+    if (idx === -1) return { success: false, message: 'Payslip not found.' };
+    this.payslips.splice(idx, 1);
+    return { success: true, message: 'Payslip deleted successfully.' };
   }
 }
 

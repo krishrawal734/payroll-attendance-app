@@ -237,39 +237,59 @@ export function promptPayslipOptions(
   payslip: Payslip,
   employee: Employee,
   onStartLoading?: () => void,
-  onEndLoading?: () => void
+  onEndLoading?: () => void,
+  onRecalculate?: () => void,
+  onDelete?: () => void
 ) {
+  const actions: any[] = [
+    {
+      text: '📤 Share Directly (WhatsApp/Apps)',
+      onPress: async () => {
+        onStartLoading?.();
+        const res = await sharePayslipDirectly(payslip, employee);
+        onEndLoading?.();
+        if (!res.success && res.error) {
+          Alert.alert('Notice', res.error);
+        }
+      },
+    },
+    {
+      text: '💾 Save PDF to Phone',
+      onPress: async () => {
+        onStartLoading?.();
+        const res = await savePayslipToPhone(payslip, employee);
+        onEndLoading?.();
+        if (!res.success && res.error) {
+          Alert.alert('Notice', res.error);
+        }
+      },
+    },
+  ];
+
+  if (onRecalculate) {
+    actions.push({
+      text: '🔄 Recalculate with Verified Punches',
+      onPress: onRecalculate,
+    });
+  }
+
+  if (onDelete) {
+    actions.push({
+      text: '🗑️ Delete Payslip (Reset to Pending)',
+      style: 'destructive',
+      onPress: onDelete,
+    });
+  }
+
+  actions.push({
+    text: 'Cancel',
+    style: 'cancel',
+  });
+
   Alert.alert(
     'Payslip Action',
     `Payslip for ${employee.fullName} (${payslip.monthYear})`,
-    [
-      {
-        text: '📤 Share Directly (WhatsApp/Apps)',
-        onPress: async () => {
-          onStartLoading?.();
-          const res = await sharePayslipDirectly(payslip, employee);
-          onEndLoading?.();
-          if (!res.success && res.error) {
-            Alert.alert('Notice', res.error);
-          }
-        },
-      },
-      {
-        text: '💾 Save PDF to Phone',
-        onPress: async () => {
-          onStartLoading?.();
-          const res = await savePayslipToPhone(payslip, employee);
-          onEndLoading?.();
-          if (!res.success && res.error) {
-            Alert.alert('Notice', res.error);
-          }
-        },
-      },
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-    ]
+    actions
   );
 }
 

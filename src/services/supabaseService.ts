@@ -515,36 +515,6 @@ export class SupabaseService {
       return db.generatePayslip(employeeId, monthYear);
     }
 
-    const { data: existing } = await supabase
-      .from('payslips')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .eq('month_year', monthYear)
-      .maybeSingle();
-
-    if (existing) {
-      return {
-        success: true,
-        payslip: {
-          id: existing.id,
-          employeeId: existing.employee_id,
-          employeeName: existing.employee_name,
-          monthYear: existing.month_year,
-          totalDays: existing.total_days,
-          presentDays: existing.present_days,
-          nightPresentDays: existing.night_present_days,
-          leavesTaken: existing.leaves_taken,
-          baseSalary: Number(existing.base_salary),
-          grossEarnings: Number(existing.gross_earnings),
-          advanceDeductions: Number(existing.advance_deductions),
-          netPayable: Number(existing.net_payable),
-          paymentStatus: existing.payment_status,
-          generatedAt: existing.generated_at,
-        },
-        message: 'Payslip already generated for this month in cloud.',
-      };
-    }
-
     const attendance = (await this.getAttendance(employeeId)).filter((a) => a.date.startsWith(monthYear));
     const presentDays = attendance.filter((a) => a.status === 'PRESENT').length;
     const nightPresentDays = attendance.filter((a) => a.isNightPresent).length;
@@ -562,6 +532,56 @@ export class SupabaseService {
     const finSummary = await this.getEmployeeFinancialSummary(employeeId, monthYear);
     const advanceDeduction = Math.min(finSummary?.activeAdvanceBalance || 0, gross);
     const net = Math.max(0, gross - advanceDeduction);
+
+    const { data: existing } = await supabase
+      .from('payslips')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .eq('month_year', monthYear)
+      .maybeSingle();
+
+    if (existing) {
+      // Recalculate and update the existing payslip with verified attendance
+      const { data, error } = await supabase
+        .from('payslips')
+        .update({
+          present_days: presentDays,
+          night_present_days: nightPresentDays,
+          leaves_taken: leaves.length,
+          base_salary: emp.baseSalary,
+          gross_earnings: gross,
+          advance_deductions: advanceDeduction,
+          net_payable: net,
+        })
+        .eq('id', existing.id)
+        .select()
+        .single();
+
+      if (error || !data) {
+        return { success: false, message: error?.message || 'Failed to update payslip' };
+      }
+
+      return {
+        success: true,
+        payslip: {
+          id: data.id,
+          employeeId: data.employee_id,
+          employeeName: data.employee_name,
+          monthYear: data.month_year,
+          totalDays: data.total_days,
+          presentDays: data.present_days,
+          nightPresentDays: data.night_present_days,
+          leavesTaken: data.leaves_taken,
+          baseSalary: Number(data.base_salary),
+          grossEarnings: Number(data.gross_earnings),
+          advanceDeductions: Number(data.advance_deductions),
+          netPayable: Number(data.net_payable),
+          paymentStatus: data.payment_status,
+          generatedAt: data.generated_at,
+        },
+        message: 'Payslip refreshed & updated with latest verified attendance.',
+      };
+    }
 
     const { data, error } = await supabase
       .from('payslips')
@@ -608,6 +628,17 @@ export class SupabaseService {
       },
       message: `Payslip for ${monthYear} generated and saved to Supabase!`,
     };
+  }
+
+  async deletePayslip(id: string): Promise<{ success: boolean; message: string }> {
+    if (!this.isUUID(id)) {
+      return db.deletePayslip(id);
+    }
+    const { error } = await supabase.from('payslips').delete().eq('id', id);
+    if (error) {
+      return { success: false, message: error.message || 'Failed to delete payslip' };
+    }
+    return { success: true, message: 'Payslip deleted successfully.' };
   }
 }
 

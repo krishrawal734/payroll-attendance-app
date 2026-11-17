@@ -135,6 +135,13 @@ export class DataService {
     }
     return db.generatePayslip(employeeId, monthYear);
   }
+
+  async deletePayslip(id: string): Promise<{ success: boolean; message: string }> {
+    if (this.isCloud()) {
+      return await supabaseService.deletePayslip(id);
+    }
+    return db.deletePayslip(id);
+  }
 }
 
 export const dataService = new DataService();
