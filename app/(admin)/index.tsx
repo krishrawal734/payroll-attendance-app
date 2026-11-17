@@ -25,6 +25,7 @@ import {
   BellRing,
 } from 'lucide-react-native';
 import { localDateString } from '../../src/utils/date';
+import { isMissedPunch } from '../../src/services/payrollCalc';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -72,10 +73,15 @@ export default function AdminDashboard() {
     loadDashboard();
   }, []);
 
+  // Counted shifts of current staff only: short (ABSENT) shifts and missed punch-outs don't count.
   const today = localDateString();
-  const todayAttendance = attendance.filter((a) => a.date === today);
-  const nightPresentCount = attendance.filter((a) => a.isNightPresent).length;
-  const pendingLeaves = leaves.filter((l) => l.status === 'PENDING');
+  const activeIds = new Set(employees.map((e) => e.id));
+  const counted = attendance.filter(
+    (a) => activeIds.has(a.employeeId) && (a.status === 'PRESENT' || a.status === 'HALF_DAY') && !isMissedPunch(a)
+  );
+  const todayAttendance = [...new Set(counted.filter((a) => a.date === today).map((a) => a.employeeId))];
+  const nightPresentCount = counted.filter((a) => a.isNightPresent && a.date.startsWith(today.slice(0, 7))).length;
+  const pendingLeaves = leaves.filter((l) => l.status === 'PENDING' && activeIds.has(l.employeeId));
 
   return (
     <ScrollView
@@ -147,7 +153,7 @@ export default function AdminDashboard() {
                 <Moon size={16} color="#7c3aed" />
               </View>
               <Text className="text-2xl font-black text-purple-900">{nightPresentCount}</Text>
-              <Text className="text-xs text-purple-700 mt-0.5 font-bold">Night Present Logs</Text>
+              <Text className="text-xs text-purple-700 mt-0.5 font-bold">Night Shifts This Month</Text>
             </TouchableOpacity>
 
             {/* Pending Leaves */}

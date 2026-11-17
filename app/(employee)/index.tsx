@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/store/authContext';
 import { dataService } from '../../src/services/dataService';
 import { notificationService } from '../../src/services/notificationService';
-import { AttendanceRecord, LeaveRequest, Payslip } from '../../src/types';
+import { AttendanceRecord, Payslip } from '../../src/types';
 import {
   Clock,
   Moon,
@@ -25,6 +25,7 @@ import {
   Bell,
   BellRing,
 } from 'lucide-react-native';
+import { isMissedPunch } from '../../src/services/payrollCalc';
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
@@ -34,24 +35,21 @@ export default function EmployeeDashboard() {
 
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | undefined>(undefined);
   const [finSummary, setFinSummary] = useState<any>(null);
-  const [userLeaves, setUserLeaves] = useState<LeaveRequest[]>([]);
   const [userAttendance, setUserAttendance] = useState<AttendanceRecord[]>([]);
   const [recentPayslip, setRecentPayslip] = useState<Payslip | undefined>(undefined);
 
   const loadData = async () => {
     if (!user) return;
     try {
-      const [todayRec, fin, leaves, atts, slips] = await Promise.all([
+      const [todayRec, fin, atts, slips] = await Promise.all([
         dataService.getTodayAttendance(user.id),
         dataService.getEmployeeFinancialSummary(user.id),
-        dataService.getLeaves(user.id),
         dataService.getAttendance(user.id),
         dataService.getPayslips(user.id),
       ]);
 
       setTodayRecord(todayRec);
       setFinSummary(fin);
-      setUserLeaves(leaves);
       setUserAttendance(atts);
       setRecentPayslip(slips[0]);
       notificationService.scheduleShiftReminders();
@@ -176,9 +174,9 @@ export default function EmployeeDashboard() {
             <CalendarX size={18} color="#d97706" />
           </View>
           <Text className="text-2xl font-black text-slate-900">
-            {userLeaves.filter((l) => l.status === 'APPROVED').length}
+            {finSummary?.leavesTaken || 0}
           </Text>
-          <Text className="text-xs text-slate-500 mt-0.5 font-medium">Approved Leaves</Text>
+          <Text className="text-xs text-slate-500 mt-0.5 font-medium">Paid Leave Days</Text>
         </View>
 
         {/* Estimated Current Earnings */}
@@ -270,7 +268,19 @@ export default function EmployeeDashboard() {
                 </View>
               </View>
 
-              {item.isNightPresent ? (
+              {isMissedPunch(item) ? (
+                <View className="bg-rose-100 px-2 py-1 rounded-md">
+                  <Text className="text-[10px] font-bold text-rose-700">Missed Punch-out</Text>
+                </View>
+              ) : item.status === 'ABSENT' ? (
+                <View className="bg-rose-100 px-2 py-1 rounded-md">
+                  <Text className="text-[10px] font-bold text-rose-700">Short Shift</Text>
+                </View>
+              ) : item.status === 'HALF_DAY' ? (
+                <View className="bg-amber-100 px-2 py-1 rounded-md">
+                  <Text className="text-[10px] font-bold text-amber-700">Half Day{item.isNightPresent ? ' • Night' : ''}</Text>
+                </View>
+              ) : item.isNightPresent ? (
                 <View className="flex-row items-center bg-purple-100 px-2 py-1 rounded-md">
                   <Moon size={10} color="#7c3aed" />
                   <Text className="text-[10px] font-bold text-purple-700 ml-1">Night (&gt;7 PM)</Text>

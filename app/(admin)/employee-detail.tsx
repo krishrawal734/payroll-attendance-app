@@ -23,7 +23,7 @@ import {
   Send,
   ChevronLeft,
 } from 'lucide-react-native';
-import { localDateString } from '../../src/utils/date';
+import { localDateString, recentMonths, monthLabel } from '../../src/utils/date';
 import { isOverpayTransfer } from '../../src/services/payrollCalc';
 
 export default function EmployeeDetailScreen() {
@@ -44,6 +44,9 @@ export default function EmployeeDetailScreen() {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('UPI');
   const [referenceId, setReferenceId] = useState('');
   const [notes, setNotes] = useState('');
+  // Salary month: last month during the first week (paying last month's salary), else this month.
+  const monthOptions = recentMonths();
+  const [salaryMonth, setSalaryMonth] = useState(new Date().getDate() <= 7 ? monthOptions[1] : monthOptions[0]);
 
   const loadData = async () => {
     if (!id) return;
@@ -113,7 +116,11 @@ export default function EmployeeDetailScreen() {
       paymentMode,
       referenceId: referenceId.trim() || undefined,
       paymentDate: localDateString(),
-      notes: notes.trim() || undefined,
+      // A salary payment's month is the first YYYY-MM in its notes, so it always leads.
+      notes:
+        txType === 'SALARY_PAYMENT'
+          ? `Salary disbursal for ${salaryMonth} via ${paymentMode}${notes.trim() ? ` — ${notes.trim()}` : ''}`
+          : notes.trim() || undefined,
     });
     setSubmitting(false);
 
@@ -375,6 +382,27 @@ export default function EmployeeDetailScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {txType === 'SALARY_PAYMENT' && (
+                <>
+                  <Text className="text-xs font-bold text-slate-600 mb-1">Salary for month *</Text>
+                  <View className="flex-row mb-3">
+                    {monthOptions.map((m) => (
+                      <TouchableOpacity
+                        key={m}
+                        className={`flex-1 py-2 rounded-xl items-center mr-1.5 border ${
+                          salaryMonth === m ? 'bg-emerald-600 border-emerald-600' : 'bg-white border-slate-200'
+                        }`}
+                        onPress={() => setSalaryMonth(m)}
+                      >
+                        <Text className={`text-xs font-bold ${salaryMonth === m ? 'text-white' : 'text-slate-600'}`}>
+                          {monthLabel(m)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
 
               {/* Amount */}
               <Text className="text-xs font-bold text-slate-600 mb-1">Amount (₹) *</Text>

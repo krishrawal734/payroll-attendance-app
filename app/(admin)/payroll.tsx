@@ -38,19 +38,13 @@ import {
   Check,
   Building2,
 } from 'lucide-react-native';
-import { localDateString, localMonthString } from '../../src/utils/date';
+import { localDateString, recentMonths, MONTH_SHORT } from '../../src/utils/date';
 
 type PayrollFilterType = 'ALL' | 'ADVANCE' | 'SLIP_DONE' | 'SLIP_PENDING';
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 export default function AdminPayrollScreen() {
-  // Current month and the two before it, newest first.
-  const recentMonths = useMemo(() => {
-    const now = new Date();
-    return [0, 1, 2].map((back) => localMonthString(new Date(now.getFullYear(), now.getMonth() - back, 1)));
-  }, []);
-  const [selectedMonth, setSelectedMonth] = useState(recentMonths[0]);
+  const monthOptions = useMemo(() => recentMonths(), []);
+  const [selectedMonth, setSelectedMonth] = useState(monthOptions[0]);
   const [payrollFilter, setPayrollFilter] = useState<PayrollFilterType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -338,8 +332,8 @@ export default function AdminPayrollScreen() {
 
             {/* Month Switcher Pills */}
             <View className="flex-row bg-slate-100 rounded-xl p-1">
-              {recentMonths.map((m) => {
-                const label = MONTH_NAMES[Number(m.slice(5, 7)) - 1];
+              {monthOptions.map((m) => {
+                const label = MONTH_SHORT[Number(m.slice(5, 7)) - 1];
                 const active = selectedMonth === m;
                 return (
                   <TouchableOpacity
