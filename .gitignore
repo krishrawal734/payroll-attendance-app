@@ -1,4 +1,6 @@
 node_modules/
+# npm only (package-lock.json); yarn skips peer deps like react-native-reanimated
+yarn.lock
 .expo/
 dist/
 web-build/

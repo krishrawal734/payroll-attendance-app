@@ -76,7 +76,7 @@ export interface Payslip {
   presentDays: number;
   nightPresentDays: number;
   nightAllowance: number; // total night bonus, frozen at the rate used when generated
-  leavesTaken: number;
+  leavesTaken: number; // paid leave days in the month (approved, non-UNPAID, not already present)
   baseSalary: number;
   grossEarnings: number;
   advanceDeductions: number;
@@ -93,7 +93,7 @@ export interface EmployeeFinancialSummary {
   totalSalaryPaid: number;
   presentDays: number;
   nightPresentDays: number;
-  leavesTaken: number;
+  leavesTaken: number; // paid leave days in the month (approved, non-UNPAID, not already present)
   nightAllowance: number;
   baseEarnings: number;
   estimatedCurrentEarnings: number;

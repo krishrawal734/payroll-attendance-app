@@ -354,7 +354,17 @@ export default function EmployeeAttendanceScreen() {
                   <Calendar size={13} color="#64748b" />
                   <Text className="text-xs font-bold text-slate-800 ml-1.5">{record.date}</Text>
                 </View>
-                {record.isNightPresent ? (
+                {record.status === 'ABSENT' ? (
+                  <View className="bg-rose-100 px-2 py-0.5 rounded-full">
+                    <Text className="text-[10px] font-bold text-rose-700">Short Shift (not counted)</Text>
+                  </View>
+                ) : record.status === 'HALF_DAY' ? (
+                  <View className="bg-amber-100 px-2 py-0.5 rounded-full">
+                    <Text className="text-[10px] font-bold text-amber-700">
+                      Half Day{record.isNightPresent ? ' • Night' : ''}
+                    </Text>
+                  </View>
+                ) : record.isNightPresent ? (
                   <View className="flex-row items-center bg-purple-100 px-2 py-0.5 rounded-full">
                     <Moon size={10} color="#7c3aed" />
                     <Text className="text-[10px] font-bold text-purple-700 ml-1">Night Present (&gt;7 PM)</Text>

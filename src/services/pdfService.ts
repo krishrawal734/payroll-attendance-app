@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
@@ -6,6 +6,39 @@ import { Payslip, Employee, AttendanceRecord } from '../types';
 import { getNightAllowance } from './settingsService';
 import { payslipStatus } from './payrollCalc';
 import { showActionMenu } from '../utils/actionMenu';
+import { COMPANY, companySubline } from '../config/companyConfig';
+
+// A4 in PDF points; expo-print defaults to US Letter otherwise.
+const A4_PORTRAIT = { width: 595, height: 842 };
+const A4_LANDSCAPE = { width: 842, height: 595 };
+
+const safeFilePart = (value: string, max = 40) => value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, max);
+
+// Android's print dialog ignores the requested paper size (it picks the locale default,
+// e.g. Letter), so on Android we render the A4 PDF ourselves and write it into a folder
+// the user picks. iOS keeps the print sheet, which honours the size.
+async function savePdfToDevice(
+  html: string,
+  fileName: string,
+  size: { width: number; height: number }
+): Promise<{ success: boolean; error?: string }> {
+  if (Platform.OS !== 'android') {
+    await Print.printAsync({ html, ...size });
+    return { success: true };
+  }
+
+  const { uri } = await Print.printToFileAsync({ html, ...size });
+  const SAF = FileSystem.StorageAccessFramework;
+  const permission = await SAF.requestDirectoryPermissionsAsync();
+  if (!permission.granted) {
+    return { success: false, error: 'No folder selected, so the PDF was not saved.' };
+  }
+  const target = await SAF.createFileAsync(permission.directoryUri, fileName, 'application/pdf');
+  const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+  await FileSystem.writeAsStringAsync(target, base64, { encoding: FileSystem.EncodingType.Base64 });
+  Alert.alert('PDF Saved', `${fileName}.pdf was saved to the folder you selected.`);
+  return { success: true };
+}
 import { localDateString } from '../utils/date';
 
 export function generatePayslipHtml(payslip: Payslip, employee: Employee): string {
@@ -20,6 +53,7 @@ export function generatePayslipHtml(payslip: Payslip, employee: Employee): strin
   <meta charset="utf-8">
   <title>Payslip - ${employee.fullName} (${payslip.monthYear})</title>
   <style>
+    @page { size: A4; margin: 12mm; }
     body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 30px; color: #1e293b; background-color: #ffffff; }
     .header { text-align: center; border-bottom: 2.5px solid #4f46e5; padding-bottom: 16px; }
     .company-name { font-size: 24px; font-weight: 900; color: #4f46e5; letter-spacing: 0.5px; }
@@ -53,8 +87,8 @@ export function generatePayslipHtml(payslip: Payslip, employee: Employee): strin
 </head>
 <body>
   <div class="header">
-    <div class="company-name">PRECISION INDUSTRIAL ENTERPRISES</div>
-    <div class="company-sub">Sector 62, Noida Industrial Area, Uttar Pradesh - 201301 • GSTIN: 09AAACP1234F1Z8</div>
+    <div class="company-name">${COMPANY.name.toUpperCase()}</div>
+    ${companySubline() ? `<div class="company-sub">${companySubline()}</div>` : ''}
     <div class="doc-title">Official Salary & Attendance Payslip — ${payslip.monthYear}</div>
   </div>
 
@@ -166,7 +200,7 @@ export function generatePayslipHtml(payslip: Payslip, employee: Employee): strin
 
   <div class="footer">
     <p>This is a tamper-proof computer-generated payslip verified via Biometric GPS Attendance & Company Payroll Passbook.</p>
-    <p>Precision Industrial Enterprises • Sector 62, Noida Industrial Area, UP - 201301</p>
+    <p>${[COMPANY.name, COMPANY.address].filter(Boolean).join(' • ')}</p>
   </div>
 </body>
 </html>
@@ -177,7 +211,7 @@ export function generatePayslipHtml(payslip: Payslip, employee: Employee): strin
 export async function sharePayslipDirectly(payslip: Payslip, employee: Employee) {
   const html = generatePayslipHtml(payslip, employee);
   try {
-    const { uri } = await Print.printToFileAsync({ html });
+    const { uri } = await Print.printToFileAsync({ html, ...A4_PORTRAIT });
 
     const safeName = (employee.fullName || 'Employee').replace(/[^a-zA-Z0-9_-]/g, '_');
     const safeMonth = (payslip.monthYear || 'Month').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -208,13 +242,13 @@ export async function sharePayslipDirectly(payslip: Payslip, employee: Employee)
       });
       return { success: true };
     } else {
-      await Print.printAsync({ html });
+      await Print.printAsync({ html, ...A4_PORTRAIT });
       return { success: true };
     }
   } catch {
     // If Sharing fails or is rejected, gracefully fallback to Android print/save spooler
     try {
-      await Print.printAsync({ html });
+      await Print.printAsync({ html, ...A4_PORTRAIT });
       return { success: true };
     } catch {
       return {
@@ -229,8 +263,11 @@ export async function sharePayslipDirectly(payslip: Payslip, employee: Employee)
 export async function savePayslipToPhone(payslip: Payslip, employee: Employee) {
   try {
     const html = generatePayslipHtml(payslip, employee);
-    await Print.printAsync({ html });
-    return { success: true };
+    return await savePdfToDevice(
+      html,
+      `Payslip_${safeFilePart(employee.fullName || 'Employee')}_${safeFilePart(payslip.monthYear || 'Month')}`,
+      A4_PORTRAIT
+    );
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to save payslip to phone' };
   }
@@ -658,9 +695,9 @@ export function generateAttendanceReportHtml(
 <body>
   <div class="header">
     <div>
-      <div class="company-title">PRECISION INDUSTRIAL ENTERPRISES</div>
+      <div class="company-title">${COMPANY.name.toUpperCase()}</div>
       <div class="report-title">${reportTitle}</div>
-      <div style="font-size: 9.5px; color: #64748b; margin-top: 2px;">Sector 62, Noida Industrial Area, Uttar Pradesh - 201301 • GSTIN: 09AAACP1234F1Z8</div>
+      ${companySubline() ? `<div style="font-size: 9.5px; color: #64748b; margin-top: 2px;">${companySubline()}</div>` : ''}
     </div>
     <div class="meta-box">
       <div><strong>Reporting Period:</strong> ${periodLabel}</div>
@@ -769,7 +806,7 @@ export async function shareAttendanceReportPdf(
 ): Promise<{ success: boolean; error?: string }> {
   const html = generateAttendanceReportHtml(records, employees, periodLabel, customTitle);
   try {
-    const { uri } = await Print.printToFileAsync({ html });
+    const { uri } = await Print.printToFileAsync({ html, ...A4_LANDSCAPE });
 
     const prefix = (customTitle?.toLowerCase().includes('daily') || periodLabel.toLowerCase().includes('daily') || periodLabel.toLowerCase().includes('today'))
       ? 'Daily_Report'
@@ -807,12 +844,12 @@ export async function shareAttendanceReportPdf(
       });
       return { success: true };
     } else {
-      await Print.printAsync({ html });
+      await Print.printAsync({ html, ...A4_LANDSCAPE });
       return { success: true };
     }
   } catch {
     try {
-      await Print.printAsync({ html });
+      await Print.printAsync({ html, ...A4_LANDSCAPE });
       return { success: true };
     } catch {
       return {
@@ -832,8 +869,7 @@ export async function saveAttendanceReportPdfToPhone(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const html = generateAttendanceReportHtml(records, employees, periodLabel, customTitle);
-    await Print.printAsync({ html });
-    return { success: true };
+    return await savePdfToDevice(html, `Attendance_${safeFilePart(periodLabel, 25)}`, A4_LANDSCAPE);
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to save attendance PDF to phone' };
   }
@@ -1163,9 +1199,9 @@ export function generatePayrollRegisterHtml(
 <body>
   <div class="header">
     <div>
-      <div class="company-title">PRECISION INDUSTRIAL ENTERPRISES</div>
+      <div class="company-title">${COMPANY.name.toUpperCase()}</div>
       <div class="report-title">Monthly Salary & Advance Disbursal Register</div>
-      <div style="font-size: 9.5px; color: #64748b; margin-top: 2px;">Sector 62, Noida Industrial Area, Uttar Pradesh - 201301 • GSTIN: 09AAACP1234F1Z8</div>
+      ${companySubline() ? `<div style="font-size: 9.5px; color: #64748b; margin-top: 2px;">${companySubline()}</div>` : ''}
     </div>
     <div class="meta-box">
       <div><strong>Payroll Cycle:</strong> ${monthName} (${monthYear})</div>
@@ -1286,7 +1322,7 @@ export async function sharePayrollRegisterPdf(
 ): Promise<{ success: boolean; error?: string }> {
   const html = generatePayrollRegisterHtml(employees, summaries, monthYear, payslips);
   try {
-    const { uri } = await Print.printToFileAsync({ html });
+    const { uri } = await Print.printToFileAsync({ html, ...A4_LANDSCAPE });
 
     const safeMonth = monthYear.replace(/[^a-zA-Z0-9_-]/g, '_');
     const cleanFileName = `Payroll_Disbursals_Register_${safeMonth}.pdf`;
@@ -1314,12 +1350,12 @@ export async function sharePayrollRegisterPdf(
       });
       return { success: true };
     } else {
-      await Print.printAsync({ html });
+      await Print.printAsync({ html, ...A4_LANDSCAPE });
       return { success: true };
     }
   } catch {
     try {
-      await Print.printAsync({ html });
+      await Print.printAsync({ html, ...A4_LANDSCAPE });
       return { success: true };
     } catch {
       return {
@@ -1339,8 +1375,7 @@ export async function savePayrollRegisterPdfToPhone(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const html = generatePayrollRegisterHtml(employees, summaries, monthYear, payslips);
-    await Print.printAsync({ html });
-    return { success: true };
+    return await savePdfToDevice(html, `Payroll_Register_${safeFilePart(monthYear)}`, A4_LANDSCAPE);
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to save payroll PDF to phone' };
   }

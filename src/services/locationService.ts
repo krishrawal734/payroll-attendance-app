@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { Platform } from 'react-native';
 import { AttendanceLocation } from '../types';
 
 export async function getCurrentAttendanceLocation(): Promise<{
@@ -50,15 +51,16 @@ export async function getCurrentAttendanceLocation(): Promise<{
       },
     };
   } catch (err: any) {
-    // Development fallback for simulator or web without real GPS
+    // Web preview has no real GPS; on a phone a failed fix must block the punch.
+    if (Platform.OS === 'web') {
+      return {
+        success: true,
+        location: { latitude: 28.6139, longitude: 77.209, address: 'Web preview (no GPS)', isMocked: false },
+      };
+    }
     return {
-      success: true,
-      location: {
-        latitude: 28.6139,
-        longitude: 77.2090,
-        address: 'HQ Industrial Area, Sector 62, Noida (Simulator GPS)',
-        isMocked: false,
-      },
+      success: false,
+      error: 'Could not get your GPS location. Turn on Location, move near a window or outdoors, and try again.',
     };
   }
 }

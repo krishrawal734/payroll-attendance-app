@@ -8,31 +8,27 @@ Built with **Expo SDK 52**, **Expo Router (v4)**, **expo-location**, **expo-prin
 
 ## 🚀 Quick Start
 
-1. Open your terminal and navigate to the project directory:
+1. Install dependencies with **npm** (not yarn — yarn skips `react-native-reanimated`, which NativeWind needs):
    ```bash
-   cd C:\Users\mrbha\.gemini\antigravity\scratch\payroll-attendance-app
+   npm ci
    ```
-2. Start the Expo development server:
+2. Configure environment:
+   - `.env` — `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, and optional company details (`EXPO_PUBLIC_COMPANY_NAME`, `EXPO_PUBLIC_COMPANY_ADDRESS`, `EXPO_PUBLIC_COMPANY_GSTIN`) printed on payslips.
+   - `.env.local` (gitignored) — `EXPO_PUBLIC_STATIC_OTP=<4-8 digits>`, the login OTP. Share it with staff privately.
+3. Set up Supabase: open your project → **SQL Editor** → run `supabase-setup.sql`. It creates `app_settings` (night allowance ₹250, full day 8h, half day 4h — edit values there, not in code) and the table permissions the app needs.
+4. Start the dev server and open the app:
    ```bash
    npx expo start
    ```
-3. Press:
-   - `a` to open on an Android emulator or scan QR with **Expo Go** on Android.
-   - `i` to open in iOS Simulator (on macOS) or scan QR with Camera on iPhone.
-   - `w` to open and preview on Web (`http://localhost:8081`).
+   Press `a` for Android, `i` for iOS Simulator, `w` for web.
 
 ---
 
-## 🔑 Pre-Registered Accounts (Instant Testing)
+## 🔑 Signing In
 
-| Role | Name | Registered Mobile Number | Description |
-| :--- | :--- | :--- | :--- |
-| **Admin** | Vikram Mehta | `9876543210` | Full administrative access to staff, attendance, leaves & payroll |
-| **Employee** | Ramesh Kumar | `9811122233` | Monthly salary staff with night shift history & payslips |
-| **Employee** | Priya Sharma | `9822233344` | Assembly supervisor with leave approvals & night shift logs |
-| **Employee** | Amit Patel | `9833344455` | Daily wage logistics worker with cash advances |
+Login is **registered mobile number + OTP**. Create the first admin by filling in and uncommenting the last block of `supabase-setup.sql`. Admins register every other employee from the **Staff** screen.
 
-*(You can also register any new employee directly from the Admin screen using their 10-digit mobile number!)*
+> The OTP is currently one static code from `.env.local`. It keeps casual users out, but it is shared by everyone and is bundled into the app — replace `src/services/otpService.ts` with a real SMS OTP before wider rollout.
 
 ---
 
@@ -40,7 +36,8 @@ Built with **Expo SDK 52**, **Expo Router (v4)**, **expo-location**, **expo-prin
 
 1. **Attendance & Night Present Logic (`app/(employee)/attendance.tsx`)**:
    - Check-in & Check-out with mandatory GPS capture.
-   - **Night Present Rule**: Any checkout at or after 7:00 PM (19:00) automatically sets `isNightPresent = true` and awards night shift allowance.
+   - **Working day rule**: shifts of 8h+ count as a full day, 4–8h as a half day, under 4h are not counted (hours set in `app_settings`).
+   - **Night Present Rule**: a checkout at or after 7:00 PM (or after midnight on an overnight shift) sets `isNightPresent = true` and earns the `night_allowance` from `app_settings`, if the shift is at least a half day.
    - Real-time digital clock with live night rule indicator.
 2. **Location Tracking & Anti-Fraud (`src/services/locationService.ts`)**:
    - Precise latitude, longitude, and reverse-geocoded physical address saved on every punch.

@@ -34,3 +34,33 @@ export function getNightAllowance(): number {
   }
   return cachedNightAllowance;
 }
+
+export interface AttendanceRules {
+  fullDayHours: number;
+  halfDayHours: number;
+}
+
+// Used when app_settings has no hours rows, so check-out never blocks on missing config.
+const DEFAULT_ATTENDANCE_RULES: AttendanceRules = { fullDayHours: 8, halfDayHours: 4 };
+
+// Worked hours needed for a full day / half day (app_settings: full_day_hours, half_day_hours).
+export async function fetchAttendanceRules(): Promise<AttendanceRules> {
+  if (!isSupabaseConfigured()) return DEFAULT_ATTENDANCE_RULES;
+
+  const { data } = await supabase
+    .from('app_settings')
+    .select('key, value')
+    .in('key', ['full_day_hours', 'half_day_hours']);
+
+  const value = (key: string) => Number(data?.find((row: any) => row.key === key)?.value);
+  const fullDayHours = value('full_day_hours');
+  const halfDayHours = value('half_day_hours');
+  return {
+    fullDayHours: Number.isFinite(fullDayHours) && fullDayHours > 0 ? fullDayHours : DEFAULT_ATTENDANCE_RULES.fullDayHours,
+    halfDayHours: Number.isFinite(halfDayHours) && halfDayHours > 0 ? halfDayHours : DEFAULT_ATTENDANCE_RULES.halfDayHours,
+  };
+}
+
+export function mockAttendanceRules(): AttendanceRules {
+  return DEFAULT_ATTENDANCE_RULES;
+}

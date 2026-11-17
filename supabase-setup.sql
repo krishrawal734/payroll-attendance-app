@@ -47,6 +47,11 @@ DROP POLICY IF EXISTS "Allow insert payslips" ON public.payslips;
 DROP POLICY IF EXISTS "Allow read own payslips or admin all" ON public.payslips;
 CREATE POLICY "Allow select payslips" ON public.payslips FOR SELECT USING (true);
 CREATE POLICY "Allow insert payslips" ON public.payslips FOR INSERT WITH CHECK (true);
+-- Recalculate updates a payslip; Delete removes it. Without these, Supabase silently changes nothing.
+DROP POLICY IF EXISTS "Allow update payslips" ON public.payslips;
+DROP POLICY IF EXISTS "Allow delete payslips" ON public.payslips;
+CREATE POLICY "Allow update payslips" ON public.payslips FOR UPDATE USING (true);
+CREATE POLICY "Allow delete payslips" ON public.payslips FOR DELETE USING (true);
 
 -- APP SETTINGS (payroll rates read by the app; edit values here, not in code)
 CREATE TABLE IF NOT EXISTS public.app_settings (
@@ -58,7 +63,7 @@ DROP POLICY IF EXISTS "Allow select app_settings" ON public.app_settings;
 CREATE POLICY "Allow select app_settings" ON public.app_settings FOR SELECT USING (true);
 
 INSERT INTO public.app_settings (key, value)
-VALUES ('night_allowance', 250)
+VALUES ('night_allowance', 250), ('full_day_hours', 8), ('half_day_hours', 4)
 ON CONFLICT (key) DO NOTHING;
 
 -- PAYSLIPS: freeze the night bonus amount at generation time so later rate changes don't rewrite history.
@@ -68,11 +73,9 @@ UPDATE public.payslips SET night_allowance = night_present_days * 250 WHERE nigh
 ALTER TABLE public.payslips ALTER COLUMN night_allowance SET DEFAULT 0;
 ALTER TABLE public.payslips ALTER COLUMN night_allowance SET NOT NULL;
 
--- 2. INSERT INITIAL SEED ACCOUNTS
-INSERT INTO public.employees (mobile_number, full_name, role, designation, base_salary, salary_type, bank_upi_id)
-VALUES 
-  ('9876543210', 'Vikram Mehta (Admin)', 'admin', 'Operations Director', 75000, 'monthly', 'vikram@okaxis'),
-  ('9811122233', 'Ramesh Kumar', 'employee', 'Senior Electrician', 28000, 'monthly', 'ramesh.kumar@upi'),
-  ('9822233344', 'Priya Sharma', 'employee', 'Assembly Supervisor', 32000, 'monthly', 'priya.sharma@paytm'),
-  ('9833344455', 'Amit Patel', 'employee', 'Logistics Handler', 950, 'daily', 'amit.patel@okhdfcbank')
-ON CONFLICT (mobile_number) DO NOTHING;
+-- 2. FIRST ADMIN ACCOUNT
+-- Fill in your own details and uncomment to create the first admin. Add everyone else from the app's Staff screen.
+-- (Demo accounts were removed: their numbers were public, which made them a back door.)
+-- INSERT INTO public.employees (mobile_number, full_name, role, designation, base_salary, salary_type, bank_upi_id)
+-- VALUES ('<10-digit mobile>', '<Your Name> (Admin)', 'admin', 'Owner', 0, 'monthly', NULL)
+-- ON CONFLICT (mobile_number) DO NOTHING;

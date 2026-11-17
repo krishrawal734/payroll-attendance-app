@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs, useRouter } from 'expo-router';
-import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
+import { TouchableOpacity, Text, View, StyleSheet, Alert } from 'react-native';
 import { LayoutDashboard, Clock, CalendarDays, FileSpreadsheet, LogOut } from 'lucide-react-native';
 import { useAuth } from '../../src/store/authContext';
 
@@ -9,8 +9,17 @@ export default function EmployeeLayout() {
   const router = useRouter();
 
   const handleLogout = () => {
-    logout();
-    router.replace('/(auth)/login');
+    Alert.alert('Log out?', 'You will need your mobile number and OTP to sign in again.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: () => {
+          logout();
+          router.replace('/(auth)/login');
+        },
+      },
+    ]);
   };
 
   return (

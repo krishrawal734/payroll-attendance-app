@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { db } from './mockDatabase';
-import { fetchNightAllowance } from './settingsService';
-import { computeFinancialSummary } from './payrollCalc';
+import { fetchNightAllowance, fetchAttendanceRules } from './settingsService';
+import { computeFinancialSummary, shiftStatus, checkOutMessage } from './payrollCalc';
 import {
   Employee,
   AttendanceRecord,
@@ -294,8 +294,9 @@ export class SupabaseService {
       return { success: false, message: 'You have already checked out for today.' };
     }
 
-    // After 7:00 PM, or a shift that ran past midnight into a later date.
-    const isNightPresent = now.getHours() >= 19 || existing.date !== localDateString(now);
+    const status = shiftStatus(existing.checkInTime, now.toISOString(), await fetchAttendanceRules());
+    // After 7:00 PM, or a shift that ran past midnight into a later date; too-short shifts earn nothing.
+    const isNightPresent = status !== 'ABSENT' && (now.getHours() >= 19 || existing.date !== localDateString(now));
 
     const { error } = await supabase
       .from('attendance')
@@ -305,6 +306,7 @@ export class SupabaseService {
         check_out_lng: loc.longitude,
         check_out_address: loc.address,
         is_night_present: isNightPresent,
+        status,
       })
       .eq('id', existing.id);
 
@@ -315,9 +317,7 @@ export class SupabaseService {
     return {
       success: true,
       isNightPresent,
-      message: isNightPresent
-        ? 'Checked out! Auto-marked as Night Present (> 7:00 PM) in cloud.'
-        : 'Checked out successfully in cloud.',
+      message: checkOutMessage(status, isNightPresent),
     };
   }
 
@@ -602,9 +602,13 @@ export class SupabaseService {
     if (!this.isUUID(id)) {
       return db.deletePayslip(id);
     }
-    const { error } = await supabase.from('payslips').delete().eq('id', id);
+    const { data, error } = await supabase.from('payslips').delete().eq('id', id).select('id');
     if (error) {
       return { success: false, message: error.message || 'Failed to delete payslip' };
+    }
+    // RLS blocks silently: no error, nothing deleted.
+    if (!data || data.length === 0) {
+      return { success: false, message: 'Payslip was not deleted (no permission or already removed). Run the latest supabase-setup.sql.' };
     }
     return { success: true, message: 'Payslip deleted successfully.' };
   }

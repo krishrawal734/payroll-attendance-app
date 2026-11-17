@@ -12,6 +12,21 @@ import {
 import { transactionMonth, salaryPaidForMonth, payslipStatus } from './payrollCalc';
 import { localDateString } from '../utils/date';
 
+// Another of the employee's leaves (in the given statuses) sharing at least one day with `leave`.
+function findOverlappingLeave(
+  existing: LeaveRequest[],
+  leave: Pick<LeaveRequest, 'fromDate' | 'toDate'> & { id?: string },
+  statuses: LeaveRequest['status'][]
+): LeaveRequest | undefined {
+  return existing.find(
+    (l) => l.id !== leave.id && statuses.includes(l.status) && l.fromDate <= leave.toDate && l.toDate >= leave.fromDate
+  );
+}
+
+function describeLeave(l: LeaveRequest): string {
+  return `${l.leaveType.toLowerCase()} leave ${l.fromDate} to ${l.toDate} (${l.status.toLowerCase()})`;
+}
+
 export class DataService {
   isCloud(): boolean {
     return isSupabaseConfigured();
@@ -86,6 +101,12 @@ export class DataService {
   }
 
   async applyLeave(leave: Omit<LeaveRequest, 'id' | 'status' | 'createdAt'>): Promise<{ success: boolean; message: string }> {
+    if (leave.fromDate > leave.toDate) {
+      return { success: false, message: 'Leave end date cannot be before the start date.' };
+    }
+    const clash = findOverlappingLeave(await this.getLeaves(leave.employeeId), leave, ['PENDING', 'APPROVED']);
+    if (clash) return { success: false, message: `These dates overlap your ${describeLeave(clash)}.` };
+
     if (this.isCloud()) {
       return await supabaseService.applyLeave(leave);
     }
@@ -94,6 +115,16 @@ export class DataService {
   }
 
   async updateLeaveStatus(leaveId: string, status: 'APPROVED' | 'REJECTED', remark?: string): Promise<{ success: boolean; message: string }> {
+    if (status === 'APPROVED') {
+      const leave = (await this.getLeaves()).find((l) => l.id === leaveId);
+      if (leave) {
+        const clash = findOverlappingLeave(await this.getLeaves(leave.employeeId), leave, ['APPROVED']);
+        if (clash) {
+          return { success: false, message: `${leave.employeeName} already has an approved ${describeLeave(clash)}. Reject this request or the other one.` };
+        }
+      }
+    }
+
     if (this.isCloud()) {
       return await supabaseService.updateLeaveStatus(leaveId, status, remark);
     }

@@ -7,8 +7,8 @@ import {
   AttendanceLocation,
   EmployeeFinancialSummary,
 } from '../types';
-import { getNightAllowance } from './settingsService';
-import { computeFinancialSummary } from './payrollCalc';
+import { getNightAllowance, mockAttendanceRules } from './settingsService';
+import { computeFinancialSummary, shiftStatus, checkOutMessage } from './payrollCalc';
 import { localDateString, localMonthString, previousLocalDateString } from '../utils/date';
 
 class MockDatabase {
@@ -128,19 +128,19 @@ class MockDatabase {
     const now = new Date();
     const checkOutIso = now.toISOString();
 
-    // After 7:00 PM (local time), or a shift that ran past midnight into a later date.
-    const isNightPresent = now.getHours() >= 19 || existing.date !== localDateString(now);
+    const status = shiftStatus(existing.checkInTime, checkOutIso, mockAttendanceRules());
+    // After 7:00 PM (local time), or a shift that ran past midnight into a later date; too-short shifts earn nothing.
+    const isNightPresent = status !== 'ABSENT' && (now.getHours() >= 19 || existing.date !== localDateString(now));
 
     existing.checkOutTime = checkOutIso;
     existing.checkOutLocation = location;
     existing.isNightPresent = isNightPresent;
+    existing.status = status;
 
     return {
       success: true,
       record: existing,
-      message: isNightPresent
-        ? 'Checked out! Auto-marked as Night Present (Checkout after 7:00 PM).'
-        : 'Checked out successfully.',
+      message: checkOutMessage(status, isNightPresent),
     };
   }
 
