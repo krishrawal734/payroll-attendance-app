@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/store/authContext';
-import { ShieldCheck, ArrowRight, UserCheck, Shield } from 'lucide-react-native';
+import { ArrowRight, UserCheck, Shield } from 'lucide-react-native';
+import WorkPulseLogo from '../../src/components/WorkPulseLogo';
 
 export default function LoginScreen() {
   const [mobileNumber, setMobileNumber] = useState('');
@@ -45,8 +46,8 @@ export default function LoginScreen() {
       <ScrollView contentContainerClassName="p-6 pt-14 pb-10">
         {/* Top Hero */}
         <View className="items-center mb-8">
-          <View className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 items-center justify-center mb-4">
-            <ShieldCheck size={36} color="#4f46e5" />
+          <View className="w-20 h-20 rounded-2xl bg-indigo-50 border border-indigo-200 items-center justify-center mb-4">
+            <WorkPulseLogo size={56} />
           </View>
           <Text className="text-3xl font-extrabold text-slate-900 tracking-tight">WorkPulse</Text>
           <Text className="text-sm text-slate-500 mt-1 text-center">
