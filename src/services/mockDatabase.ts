@@ -7,6 +7,7 @@ import {
   AttendanceLocation,
   EmployeeFinancialSummary,
 } from '../types';
+import { textbeeService } from './textbeeService';
 
 class MockDatabase {
   private employees: Employee[] = [];
@@ -99,6 +100,12 @@ class MockDatabase {
       this.attendance.unshift(newRecord);
     }
 
+    const emp = this.getEmployeeById(employeeId);
+    if (emp) {
+      const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      textbeeService.sendCheckInSms(emp, timeStr, today).catch(() => {});
+    }
+
     return { success: true, record: newRecord, message: 'Checked in successfully!' };
   }
 
@@ -124,6 +131,12 @@ class MockDatabase {
     existing.checkOutTime = checkOutIso;
     existing.checkOutLocation = location;
     existing.isNightPresent = isNightPresent;
+
+    const emp = this.getEmployeeById(employeeId);
+    if (emp) {
+      const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      textbeeService.sendCheckOutSms(emp, timeStr, isNightPresent).catch(() => {});
+    }
 
     return {
       success: true,
@@ -178,6 +191,18 @@ class MockDatabase {
       createdAt: new Date().toISOString(),
     };
     this.transactions.unshift(newTx);
+
+    const emp = this.getEmployeeById(data.employeeId);
+    if (emp) {
+      if (data.type === 'SALARY_PAYMENT') {
+        const monthYear = data.notes?.match(/\d{4}-\d{2}/)?.[0] || data.paymentDate.slice(0, 7);
+        textbeeService.sendSalaryDisbursalSms(emp, data.amount, data.paymentMode, monthYear, data.referenceId).catch(() => {});
+      } else if (data.type === 'ADVANCE_PAID') {
+        const fin = this.getEmployeeFinancialSummary(data.employeeId);
+        textbeeService.sendAdvanceDisbursalSms(emp, data.amount, data.paymentMode, fin?.activeAdvanceBalance).catch(() => {});
+      }
+    }
+
     return { success: true, transaction: newTx, message: 'Transaction recorded successfully.' };
   }
 
@@ -283,6 +308,7 @@ class MockDatabase {
         advanceDeductions: advanceDeduction,
         netPayable: net,
       };
+      textbeeService.sendPayslipReadySms(emp, monthYear, net).catch(() => {});
       return {
         success: true,
         payslip: this.payslips[existingIdx],
@@ -308,6 +334,7 @@ class MockDatabase {
     };
 
     this.payslips.unshift(newPayslip);
+    textbeeService.sendPayslipReadySms(emp, monthYear, net).catch(() => {});
     return { success: true, payslip: newPayslip, message: `Payslip for ${monthYear} generated successfully.` };
   }
 
