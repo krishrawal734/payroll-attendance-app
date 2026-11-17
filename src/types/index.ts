@@ -93,9 +93,12 @@ export interface EmployeeFinancialSummary {
   totalSalaryPaid: number;
   presentDays: number;
   nightPresentDays: number;
+  leavesTaken: number;
   nightAllowance: number;
   baseEarnings: number;
   estimatedCurrentEarnings: number;
-  advanceDeduction: number;
-  pendingPayable: number;
+  advanceDeduction: number; // advance recovered (or to recover) from this month's earnings
+  advanceRecoveredThisMonth: number; // part of advanceDeduction already recorded as DEDUCTION
+  salaryPaidThisMonth: number;
+  pendingPayable: number; // still owed for the month after recovery and payments
 }

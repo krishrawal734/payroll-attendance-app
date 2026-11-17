@@ -18,6 +18,7 @@ import {
   savePayrollRegisterPdfToPhone,
 } from '../../src/services/pdfService';
 import { exportService } from '../../src/services/exportService';
+import { remainingPayable } from '../../src/services/payrollCalc';
 import { Employee, Payslip, PaymentMode } from '../../src/types';
 import {
   FileSpreadsheet,
@@ -116,8 +117,8 @@ export default function AdminPayrollScreen() {
     const gross = payslip ? payslip.grossEarnings : (fin?.estimatedCurrentEarnings || 0);
     const night = payslip ? payslip.nightAllowance : (fin?.nightAllowance || 0);
     const active = fin?.activeAdvanceBalance || 0;
-    const advRec = payslip ? payslip.advanceDeductions : Math.min(active, gross);
-    const net = payslip ? payslip.netPayable : Math.max(0, gross - advRec);
+    const advRec = payslip ? payslip.advanceDeductions : (fin?.advanceDeduction || 0);
+    const net = remainingPayable(fin, payslip);
 
     totalGross += gross;
     totalNight += night;
@@ -236,11 +237,7 @@ export default function AdminPayrollScreen() {
     const payslip = allPayslips.find(
       (p) => p.employeeId === emp.id && p.monthYear === selectedMonth
     );
-    const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
-    const activeAdv = fin?.activeAdvanceBalance || 0;
-    const advRec = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
-    const payable = payslip?.netPayable ?? Math.max(0, gross - advRec);
-    setPayAmount(String(payable));
+    setPayAmount(String(remainingPayable(fin, payslip)));
     setPaymentModalVisible(true);
   };
 
@@ -505,9 +502,7 @@ export default function AdminPayrollScreen() {
               const nightShifts = payslip?.nightPresentDays ?? (fin?.nightPresentDays || 0);
               const nightBonus = payslip?.nightAllowance ?? (fin?.nightAllowance || 0);
               const activeAdv = fin?.activeAdvanceBalance || 0;
-              const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
-              const advRec = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
-              const netPayable = payslip?.netPayable ?? Math.max(0, gross - advRec);
+              const netPayable = remainingPayable(fin, payslip);
               const isPaid = payslip?.paymentStatus === 'PAID';
 
               return (
@@ -614,12 +609,15 @@ export default function AdminPayrollScreen() {
                     )}
 
                     <TouchableOpacity
-                      className="flex-1 flex-row items-center justify-center bg-emerald-600 py-2.5 rounded-xl shadow-xs active:bg-emerald-700"
+                      className={`flex-1 flex-row items-center justify-center py-2.5 rounded-xl shadow-xs ${
+                        netPayable > 0 ? 'bg-emerald-600 active:bg-emerald-700' : 'bg-slate-300'
+                      }`}
+                      disabled={netPayable <= 0}
                       onPress={() => openPaymentModal(emp)}
                     >
                       <IndianRupee size={14} color="#ffffff" />
                       <Text className="text-white text-xs font-black ml-1.5">
-                        Record Pay (UPI/Cash)
+                        {netPayable > 0 ? 'Record Pay (UPI/Cash)' : 'Nothing Pending'}
                       </Text>
                     </TouchableOpacity>
                   </View>

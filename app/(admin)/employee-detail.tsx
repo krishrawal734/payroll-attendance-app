@@ -266,6 +266,8 @@ export default function EmployeeDetailScreen() {
                     ? 'Advance Disbursed'
                     : tx.type === 'SALARY_PAYMENT'
                     ? 'Salary Disbursed'
+                    : tx.type === 'DEDUCTION'
+                    ? 'Advance Recovered'
                     : tx.type}
                 </Text>
                 <Text className="text-[11px] text-slate-500 mt-0.5">

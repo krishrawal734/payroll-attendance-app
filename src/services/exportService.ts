@@ -3,6 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
 import { AttendanceRecord, Employee } from '../types';
 import { getNightAllowance } from './settingsService';
+import { payslipStatus } from './payrollCalc';
 import {
   shareAttendanceReportPdf,
   saveAttendanceReportPdfToPhone,
@@ -197,9 +198,9 @@ export class ExportService {
         const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
         const baseShiftEarnings = gross - nightBonus;
         const activeAdv = fin?.activeAdvanceBalance || 0;
-        const advanceDeduction = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
+        const advanceDeduction = payslip?.advanceDeductions ?? (fin?.advanceDeduction || 0);
         const net = payslip?.netPayable ?? Math.max(0, gross - advanceDeduction);
-        const status = payslip?.paymentStatus || (net <= 0 ? 'PAID' : 'PENDING DISBURSAL');
+        const status = payslip?.paymentStatus || payslipStatus(net, fin?.salaryPaidThisMonth || 0);
 
         return [
           this.escapeCsv(emp.fullName),

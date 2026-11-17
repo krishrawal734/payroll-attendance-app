@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { db } from './mockDatabase';
 import { fetchNightAllowance } from './settingsService';
+import { computeFinancialSummary } from './payrollCalc';
 import {
   Employee,
   AttendanceRecord,
@@ -432,54 +433,14 @@ export class SupabaseService {
       return db.getEmployeeFinancialSummary(employeeId, monthYear);
     }
 
-    const txs = await this.getTransactions(employeeId);
-
-    const totalAdvancesTaken = txs
-      .filter((t) => t.type === 'ADVANCE_PAID')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const totalAdvancesRecovered = txs
-      .filter((t) => t.type === 'DEDUCTION')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const activeAdvanceBalance = Math.max(0, totalAdvancesTaken - totalAdvancesRecovered);
-
-    const totalSalaryPaid = txs
-      .filter((t) => t.type === 'SALARY_PAYMENT')
-      .reduce((sum, t) => sum + t.amount, 0);
-
+    const [txs, attendance, leaves, nightAllowanceRate] = await Promise.all([
+      this.getTransactions(employeeId),
+      this.getAttendance(employeeId),
+      this.getLeaves(employeeId),
+      fetchNightAllowance(),
+    ]);
     const targetMonth = monthYear || new Date().toISOString().slice(0, 7);
-    const attendance = (await this.getAttendance(employeeId)).filter((a) => a.date.startsWith(targetMonth));
-    const presentDays = attendance.filter((a) => a.status === 'PRESENT').length;
-    const nightPresentDays = attendance.filter((a) => a.isNightPresent).length;
-    const leaves = (await this.getLeaves(employeeId)).filter(
-      (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(targetMonth) || l.toDate.startsWith(targetMonth))
-    );
-
-    const nightAllowance = nightPresentDays * (await fetchNightAllowance());
-    const payableDays = Math.min(presentDays + leaves.length, 30);
-    const baseEarnings = emp.salaryType === 'monthly'
-      ? Math.round((emp.baseSalary / 30) * payableDays)
-      : Math.round(emp.baseSalary * presentDays);
-
-    const estimatedCurrentEarnings = baseEarnings + nightAllowance;
-    const advanceDeduction = Math.min(activeAdvanceBalance, estimatedCurrentEarnings);
-    const pendingPayable = Math.max(0, estimatedCurrentEarnings - advanceDeduction);
-
-    return {
-      baseSalary: emp.baseSalary,
-      salaryType: emp.salaryType,
-      activeAdvanceBalance,
-      totalAdvancesTaken,
-      totalSalaryPaid,
-      presentDays,
-      nightPresentDays,
-      nightAllowance,
-      baseEarnings,
-      estimatedCurrentEarnings,
-      advanceDeduction,
-      pendingPayable,
-    };
+    return computeFinancialSummary(emp, txs, attendance, leaves, nightAllowanceRate, targetMonth);
   }
 
   // --- Payslips ---
@@ -519,29 +480,16 @@ export class SupabaseService {
       return db.generatePayslip(employeeId, monthYear);
     }
 
-    const attendance = (await this.getAttendance(employeeId)).filter((a) => a.date.startsWith(monthYear));
-    const presentDays = attendance.filter((a) => a.status === 'PRESENT').length;
-    const nightPresentDays = attendance.filter((a) => a.isNightPresent).length;
-    const leaves = (await this.getLeaves(employeeId)).filter(
-      (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(monthYear) || l.toDate.startsWith(monthYear))
-    );
-
-    let nightAllowanceRate: number;
+    let fin: EmployeeFinancialSummary | null;
     try {
-      nightAllowanceRate = await fetchNightAllowance();
+      fin = await this.getEmployeeFinancialSummary(employeeId, monthYear);
     } catch (err) {
       return { success: false, message: (err as Error).message };
     }
+    if (!fin) return { success: false, message: 'Employee not found.' };
 
-    const nightAllowance = nightPresentDays * nightAllowanceRate;
-    const payableDays = Math.min(presentDays + leaves.length, 30);
-    const baseEarnings = emp.salaryType === 'monthly'
-      ? Math.round((emp.baseSalary / 30) * payableDays)
-      : Math.round(emp.baseSalary * presentDays);
-    const gross = baseEarnings + nightAllowance;
-
-    const finSummary = await this.getEmployeeFinancialSummary(employeeId, monthYear);
-    const advanceDeduction = Math.min(finSummary?.activeAdvanceBalance || 0, gross);
+    const { presentDays, nightPresentDays, nightAllowance, leavesTaken, advanceDeduction } = fin;
+    const gross = fin.estimatedCurrentEarnings;
     const net = Math.max(0, gross - advanceDeduction);
 
     const { data: existing } = await supabase
@@ -559,7 +507,7 @@ export class SupabaseService {
           present_days: presentDays,
           night_present_days: nightPresentDays,
           night_allowance: nightAllowance,
-          leaves_taken: leaves.length,
+          leaves_taken: leavesTaken,
           base_salary: emp.baseSalary,
           gross_earnings: gross,
           advance_deductions: advanceDeduction,
@@ -607,7 +555,7 @@ export class SupabaseService {
           present_days: presentDays,
           night_present_days: nightPresentDays,
           night_allowance: nightAllowance,
-          leaves_taken: leaves.length,
+          leaves_taken: leavesTaken,
           base_salary: emp.baseSalary,
           gross_earnings: gross,
           advance_deductions: advanceDeduction,

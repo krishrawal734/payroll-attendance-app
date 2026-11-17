@@ -201,7 +201,11 @@ export default function EmployeePayslipsScreen() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-xs font-bold text-slate-900">
-                    {tx.type === 'ADVANCE_PAID' ? 'Advance Received' : 'Salary Disbursed'}
+                    {tx.type === 'ADVANCE_PAID'
+                      ? 'Advance Received'
+                      : tx.type === 'DEDUCTION'
+                      ? 'Advance Recovered from Salary'
+                      : 'Salary Disbursed'}
                   </Text>
                   <Text className="text-[11px] text-slate-500 mt-0.5">
                     {tx.paymentDate} • Via {tx.paymentMode} {tx.referenceId ? `(${tx.referenceId})` : ''}

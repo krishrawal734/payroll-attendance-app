@@ -9,6 +9,7 @@ import {
   Payslip,
   AttendanceLocation,
 } from '../types';
+import { transactionMonth, salaryPaidForMonth, payslipStatus } from './payrollCalc';
 
 export class DataService {
   isCloud(): boolean {
@@ -106,12 +107,53 @@ export class DataService {
     return db.getTransactions(employeeId);
   }
 
+  // Salary payments are capped at what is still owed for their month, and record the
+  // month's advance recovery first so the advance balance actually goes down.
   async recordTransaction(tx: Omit<SalaryTransaction, 'id' | 'createdAt'>): Promise<{ success: boolean; message: string }> {
+    if (tx.type === 'SALARY_PAYMENT') {
+      const month = transactionMonth(tx);
+      const fin = await this.getEmployeeFinancialSummary(tx.employeeId, month);
+      if (!fin) return { success: false, message: 'Employee not found.' };
+      if (tx.amount > fin.pendingPayable) {
+        return {
+          success: false,
+          message:
+            `Only ₹${fin.pendingPayable.toLocaleString('en-IN')} is pending for ${month} ` +
+            `(₹${fin.salaryPaidThisMonth.toLocaleString('en-IN')} already paid, ` +
+            `₹${fin.advanceDeduction.toLocaleString('en-IN')} advance recovery). ` +
+            'Record any extra amount as an advance instead.',
+        };
+      }
+      const settled = await this.settleAdvanceRecovery(tx.employeeId, tx.employeeName, month);
+      if (!settled.success) return settled;
+    }
+    return this.insertTransaction(tx);
+  }
+
+  private async insertTransaction(tx: Omit<SalaryTransaction, 'id' | 'createdAt'>): Promise<{ success: boolean; message: string }> {
     if (this.isCloud()) {
       return await supabaseService.recordTransaction(tx);
     }
     const res = db.recordTransaction(tx);
     return { success: res.success, message: res.message };
+  }
+
+  // Writes the not-yet-recorded part of a month's advance recovery as a DEDUCTION entry.
+  private async settleAdvanceRecovery(employeeId: string, employeeName: string, month: string): Promise<{ success: boolean; message: string }> {
+    const fin = await this.getEmployeeFinancialSummary(employeeId, month);
+    const due = fin ? fin.advanceDeduction - fin.advanceRecoveredThisMonth : 0;
+    if (due <= 0) return { success: true, message: '' };
+
+    const res = await this.insertTransaction({
+      employeeId,
+      employeeName,
+      type: 'DEDUCTION',
+      amount: due,
+      paymentMode: 'CASH',
+      paymentDate: new Date().toISOString().split('T')[0],
+      notes: `Advance recovery for ${month}`,
+    });
+    return res.success ? res : { success: false, message: `Could not record advance recovery: ${res.message}` };
   }
 
   async getEmployeeFinancialSummary(employeeId: string, monthYear?: string) {
@@ -122,18 +164,35 @@ export class DataService {
   }
 
   // --- Payslips ---
+  // Payment status is derived from the ledger, so it stays correct without updating payslip rows.
   async getPayslips(employeeId?: string): Promise<Payslip[]> {
-    if (this.isCloud()) {
-      return await supabaseService.getPayslips(employeeId);
-    }
-    return db.getPayslips(employeeId);
+    const [slips, txs] = await Promise.all([
+      this.isCloud() ? supabaseService.getPayslips(employeeId) : db.getPayslips(employeeId),
+      this.getTransactions(employeeId),
+    ]);
+    return slips.map((ps) => this.withPaymentStatus(ps, txs));
   }
 
   async generatePayslip(employeeId: string, monthYear: string): Promise<{ success: boolean; payslip?: Payslip; message: string }> {
-    if (this.isCloud()) {
-      return await supabaseService.generatePayslip(employeeId, monthYear);
-    }
-    return db.generatePayslip(employeeId, monthYear);
+    const emp = await this.getEmployeeById(employeeId);
+    if (!emp) return { success: false, message: 'Employee not found.' };
+
+    const res = this.isCloud()
+      ? await supabaseService.generatePayslip(employeeId, monthYear)
+      : db.generatePayslip(employeeId, monthYear);
+    if (!res.success || !res.payslip) return res;
+
+    // The payslip deducts the advance, so record that recovery in the ledger now.
+    const settled = await this.settleAdvanceRecovery(employeeId, emp.fullName, monthYear);
+    if (!settled.success) return { ...res, success: false, message: settled.message };
+
+    const txs = await this.getTransactions(employeeId);
+    return { ...res, payslip: this.withPaymentStatus(res.payslip, txs) };
+  }
+
+  private withPaymentStatus(ps: Payslip, txs: SalaryTransaction[]): Payslip {
+    const paid = salaryPaidForMonth(txs, ps.employeeId, ps.monthYear);
+    return { ...ps, paymentStatus: payslipStatus(ps.netPayable, paid) };
   }
 
   async deletePayslip(id: string): Promise<{ success: boolean; message: string }> {

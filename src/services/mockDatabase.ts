@@ -8,6 +8,7 @@ import {
   EmployeeFinancialSummary,
 } from '../types';
 import { getNightAllowance } from './settingsService';
+import { computeFinancialSummary } from './payrollCalc';
 
 class MockDatabase {
   private employees: Employee[] = [];
@@ -188,58 +189,15 @@ class MockDatabase {
     const emp = this.getEmployeeById(employeeId);
     if (!emp) return null;
 
-    const txs = this.getTransactions(employeeId);
-
-    // Total advance paid to this employee
-    const totalAdvancesTaken = txs
-      .filter((t) => t.type === 'ADVANCE_PAID')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    // Total deductions recovered against advances
-    const totalAdvancesRecovered = txs
-      .filter((t) => t.type === 'DEDUCTION')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const activeAdvanceBalance = Math.max(0, totalAdvancesTaken - totalAdvancesRecovered);
-
-    // Total salary disbursed historically
-    const totalSalaryPaid = txs
-      .filter((t) => t.type === 'SALARY_PAYMENT')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    // Month attendance count
     const targetMonth = monthYear || new Date().toISOString().slice(0, 7); // e.g. "2026-11"
-    const empAttendance = this.getAttendance(employeeId).filter((a) => a.date.startsWith(targetMonth));
-    const presentDays = empAttendance.filter((a) => a.status === 'PRESENT').length;
-    const nightPresentDays = empAttendance.filter((a) => a.isNightPresent).length;
-    const leaves = this.getLeaves(employeeId).filter(
-      (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(targetMonth) || l.toDate.startsWith(targetMonth))
+    return computeFinancialSummary(
+      emp,
+      this.getTransactions(employeeId),
+      this.getAttendance(employeeId),
+      this.getLeaves(employeeId),
+      getNightAllowance(),
+      targetMonth
     );
-
-    const nightAllowance = nightPresentDays * getNightAllowance();
-    const payableDays = Math.min(presentDays + leaves.length, 30);
-    const baseEarnings = emp.salaryType === 'monthly'
-      ? Math.round((emp.baseSalary / 30) * payableDays)
-      : Math.round(emp.baseSalary * presentDays);
-
-    const estimatedCurrentEarnings = baseEarnings + nightAllowance;
-    const advanceDeduction = Math.min(activeAdvanceBalance, estimatedCurrentEarnings);
-    const pendingPayable = Math.max(0, estimatedCurrentEarnings - advanceDeduction);
-
-    return {
-      baseSalary: emp.baseSalary,
-      salaryType: emp.salaryType,
-      activeAdvanceBalance,
-      totalAdvancesTaken,
-      totalSalaryPaid,
-      presentDays,
-      nightPresentDays,
-      nightAllowance,
-      baseEarnings,
-      estimatedCurrentEarnings,
-      advanceDeduction,
-      pendingPayable,
-    };
   }
 
   // --- Payslips ---
@@ -254,23 +212,11 @@ class MockDatabase {
     const emp = this.getEmployeeById(employeeId);
     if (!emp) return { success: false, message: 'Employee not found.' };
 
-    const empAttendance = this.getAttendance(employeeId).filter((a) => a.date.startsWith(monthYear));
-    const presentDays = empAttendance.filter((a) => a.status === 'PRESENT').length;
-    const nightPresentDays = empAttendance.filter((a) => a.isNightPresent).length;
-    const leaves = this.getLeaves(employeeId).filter(
-      (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(monthYear) || l.toDate.startsWith(monthYear))
-    );
+    const fin = this.getEmployeeFinancialSummary(employeeId, monthYear);
+    if (!fin) return { success: false, message: 'Employee not found.' };
 
-    const nightAllowance = nightPresentDays * getNightAllowance();
-    const payableDays = Math.min(presentDays + leaves.length, 30);
-    const baseEarnings = emp.salaryType === 'monthly'
-      ? Math.round((emp.baseSalary / 30) * payableDays)
-      : Math.round(emp.baseSalary * presentDays);
-    const gross = baseEarnings + nightAllowance;
-
-    // Deduct active advances accurately (capped at gross)
-    const finSummary = this.getEmployeeFinancialSummary(employeeId, monthYear);
-    const advanceDeduction = Math.min(finSummary?.activeAdvanceBalance || 0, gross);
+    const { presentDays, nightPresentDays, nightAllowance, leavesTaken, advanceDeduction } = fin;
+    const gross = fin.estimatedCurrentEarnings;
     const net = Math.max(0, gross - advanceDeduction);
 
     const existingIdx = this.payslips.findIndex((p) => p.employeeId === employeeId && p.monthYear === monthYear);
@@ -280,7 +226,7 @@ class MockDatabase {
         presentDays,
         nightPresentDays,
         nightAllowance,
-        leavesTaken: leaves.length,
+        leavesTaken,
         baseSalary: emp.baseSalary,
         grossEarnings: gross,
         advanceDeductions: advanceDeduction,
@@ -302,7 +248,7 @@ class MockDatabase {
       presentDays,
       nightPresentDays,
       nightAllowance,
-      leavesTaken: leaves.length,
+      leavesTaken,
       baseSalary: emp.baseSalary,
       grossEarnings: gross,
       advanceDeductions: advanceDeduction,

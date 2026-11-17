@@ -4,6 +4,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { Payslip, Employee, AttendanceRecord } from '../types';
 import { getNightAllowance } from './settingsService';
+import { payslipStatus } from './payrollCalc';
 
 export function generatePayslipHtml(payslip: Payslip, employee: Employee): string {
   const empCode = `EMP-${employee.id.slice(0, 5).toUpperCase()}`;
@@ -925,9 +926,9 @@ export function generatePayrollRegisterHtml(
       const nightBonus = payslip?.nightAllowance ?? (fin?.nightAllowance || 0);
       const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
       const activeAdv = fin?.activeAdvanceBalance || 0;
-      const advanceDeduction = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
+      const advanceDeduction = payslip?.advanceDeductions ?? (fin?.advanceDeduction || 0);
       const net = payslip?.netPayable ?? Math.max(0, gross - advanceDeduction);
-      const status = payslip?.paymentStatus || (net <= 0 ? 'PAID' : 'PENDING DISBURSAL');
+      const status = payslip?.paymentStatus || payslipStatus(net, fin?.salaryPaidThisMonth || 0);
 
       totalGross += gross;
       totalNightBonuses += nightBonus;
