@@ -11,6 +11,7 @@ import {
   AttendanceLocation,
   EmployeeFinancialSummary,
 } from '../types';
+import { localDateString, localMonthString, previousLocalDateString } from '../utils/date';
 
 export class SupabaseService {
   // Helper to check if string is valid UUID
@@ -189,19 +190,24 @@ export class SupabaseService {
     }));
   }
 
+  // Today's record, or last night's shift if it is still open (checked in, not out) after midnight.
   async getTodayAttendance(employeeId: string): Promise<AttendanceRecord | undefined> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateString();
+    const yesterday = previousLocalDateString();
     if (!this.isUUID(employeeId)) {
       return db.getTodayAttendance(employeeId);
     }
-    const { data, error } = await supabase
+    const { data: rows, error } = await supabase
       .from('attendance')
       .select('*')
       .eq('employee_id', employeeId)
-      .eq('date', today)
-      .maybeSingle();
+      .in('date', [today, yesterday]);
 
-    if (error || !data) return undefined;
+    if (error || !rows) return undefined;
+    const data =
+      rows.find((r: any) => r.date === today) ??
+      rows.find((r: any) => r.date === yesterday && r.check_in_time && !r.check_out_time);
+    if (!data) return undefined;
     return {
       id: data.id,
       employeeId: data.employee_id,
@@ -229,7 +235,7 @@ export class SupabaseService {
   }
 
   async checkIn(employeeId: string, loc: AttendanceLocation): Promise<{ success: boolean; message: string }> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateString();
 
     if (!this.isUUID(employeeId)) {
       const res = db.checkIn(employeeId, loc);
@@ -245,6 +251,11 @@ export class SupabaseService {
 
     if (existing && existing.check_in_time) {
       return { success: false, message: 'You have already checked in for today!' };
+    }
+
+    const openShift = await this.getTodayAttendance(employeeId);
+    if (openShift && openShift.date !== today) {
+      return { success: false, message: `Please check out of your shift from ${openShift.date} first.` };
     }
 
     const { error } = await supabase.from('attendance').insert([
@@ -268,28 +279,23 @@ export class SupabaseService {
   }
 
   async checkOut(employeeId: string, loc: AttendanceLocation): Promise<{ success: boolean; isNightPresent?: boolean; message: string }> {
-    const today = new Date().toISOString().split('T')[0];
     const now = new Date();
-    const isNightPresent = now.getHours() >= 19; // After 7:00 PM
 
     if (!this.isUUID(employeeId)) {
       const res = db.checkOut(employeeId, loc);
       return { success: res.success, isNightPresent: res.record?.isNightPresent, message: res.message };
     }
 
-    const { data: existing } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .eq('date', today)
-      .maybeSingle();
-
-    if (!existing || !existing.check_in_time) {
+    const existing = await this.getTodayAttendance(employeeId);
+    if (!existing || !existing.checkInTime) {
       return { success: false, message: 'Please check in first before checking out.' };
     }
-    if (existing.check_out_time) {
+    if (existing.checkOutTime) {
       return { success: false, message: 'You have already checked out for today.' };
     }
+
+    // After 7:00 PM, or a shift that ran past midnight into a later date.
+    const isNightPresent = now.getHours() >= 19 || existing.date !== localDateString(now);
 
     const { error } = await supabase
       .from('attendance')
@@ -300,8 +306,7 @@ export class SupabaseService {
         check_out_address: loc.address,
         is_night_present: isNightPresent,
       })
-      .eq('employee_id', employeeId)
-      .eq('date', today);
+      .eq('id', existing.id);
 
     if (error) {
       return { success: false, message: error.message };
@@ -439,7 +444,7 @@ export class SupabaseService {
       this.getLeaves(employeeId),
       fetchNightAllowance(),
     ]);
-    const targetMonth = monthYear || new Date().toISOString().slice(0, 7);
+    const targetMonth = monthYear || localMonthString();
     return computeFinancialSummary(emp, txs, attendance, leaves, nightAllowanceRate, targetMonth);
   }
 

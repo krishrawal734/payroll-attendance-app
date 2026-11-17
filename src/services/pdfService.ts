@@ -5,6 +5,8 @@ import * as FileSystem from 'expo-file-system';
 import { Payslip, Employee, AttendanceRecord } from '../types';
 import { getNightAllowance } from './settingsService';
 import { payslipStatus } from './payrollCalc';
+import { showActionMenu } from '../utils/actionMenu';
+import { localDateString } from '../utils/date';
 
 export function generatePayslipHtml(payslip: Payslip, employee: Employee): string {
   const empCode = `EMP-${employee.id.slice(0, 5).toUpperCase()}`;
@@ -129,7 +131,7 @@ export function generatePayslipHtml(payslip: Payslip, employee: Employee): strin
       <tr>
         <td>
           <strong>Night Shift Allowance</strong><br>
-          <span style="font-size: 10px; color: #7c3aed;">${payslip.nightPresentDays} night shifts × ₹${payslip.nightPresentDays > 0 ? Math.round(nightAllowance / payslip.nightPresentDays) : 0} bonus</span>
+          <span style="font-size: 10px; color: #7c3aed;">${payslip.nightPresentDays} night shifts × ₹${payslip.nightPresentDays > 0 ? Math.round(nightAllowance / payslip.nightPresentDays) : getNightAllowance()} bonus</span>
         </td>
         <td style="text-align: right; font-weight: 700; color: #7c3aed;">+ ₹${nightAllowance.toLocaleString('en-IN')}</td>
         <td>
@@ -288,7 +290,7 @@ export function promptPayslipOptions(
     style: 'cancel',
   });
 
-  Alert.alert(
+  showActionMenu(
     'Payslip Action',
     `Payslip for ${employee.fullName} (${payslip.monthYear})`,
     actions
@@ -401,7 +403,7 @@ export function generateAttendanceReportHtml(
         const inD = new Date(rec.checkInTime);
         const nowMs = Date.now();
         const diffMs = nowMs - inD.getTime();
-        if (diffMs > 0 && rec.date === new Date().toISOString().split('T')[0]) {
+        if (diffMs > 0 && rec.date === localDateString()) {
           const totalM = Math.round(diffMs / 60000);
           const h = Math.floor(totalM / 60);
           const m = totalM % 60;
@@ -846,7 +848,7 @@ export function promptAttendanceExportOptions(
   onStartLoading?: () => void,
   onEndLoading?: () => void
 ) {
-  Alert.alert(
+  showActionMenu(
     'Export Attendance Report',
     `Select format to export ${records.length} attendance record(s) for ${periodLabel}:`,
     [
@@ -1355,7 +1357,7 @@ export function promptPayrollExportOptions(
   onEndLoading?: () => void
 ) {
   const staffCount = employees.filter((e) => e.role === 'employee').length;
-  Alert.alert(
+  showActionMenu(
     'Export Payroll & Advances Register',
     `Select format to export payroll sheet for ${monthYear} (${staffCount} employees):`,
     [

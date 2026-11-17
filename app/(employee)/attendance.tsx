@@ -22,6 +22,8 @@ import {
   FileText,
 } from 'lucide-react-native';
 import { shareAttendanceReportPdf } from '../../src/services/pdfService';
+import { showActionMenu } from '../../src/utils/actionMenu';
+import { localDateString } from '../../src/utils/date';
 
 export default function EmployeeAttendanceScreen() {
   const { user } = useAuth();
@@ -41,15 +43,15 @@ export default function EmployeeAttendanceScreen() {
       return;
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = localDateString();
     const monthStr = todayStr.slice(0, 7);
     const monthName = new Date().toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 
     const past7 = new Date();
     past7.setDate(past7.getDate() - 6);
-    const past7Str = past7.toISOString().split('T')[0];
+    const past7Str = localDateString(past7);
 
-    Alert.alert(
+    showActionMenu(
       'Export Attendance Report',
       'Choose the attendance period to download or share:',
       [

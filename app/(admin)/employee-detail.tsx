@@ -23,6 +23,7 @@ import {
   Send,
   ChevronLeft,
 } from 'lucide-react-native';
+import { localDateString } from '../../src/utils/date';
 
 export default function EmployeeDetailScreen() {
   const router = useRouter();
@@ -110,7 +111,7 @@ export default function EmployeeDetailScreen() {
       amount: val,
       paymentMode,
       referenceId: referenceId.trim() || undefined,
-      paymentDate: new Date().toISOString().split('T')[0],
+      paymentDate: localDateString(),
       notes: notes.trim() || undefined,
     });
     setSubmitting(false);

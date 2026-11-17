@@ -22,6 +22,7 @@ import {
   X,
   Check,
 } from 'lucide-react-native';
+import { localDateString } from '../../src/utils/date';
 
 export default function AdminEmployeesScreen() {
   const router = useRouter();
@@ -100,7 +101,7 @@ export default function AdminEmployeesScreen() {
       baseSalary: salary,
       salaryType,
       role: 'employee',
-      joiningDate: new Date().toISOString().split('T')[0],
+      joiningDate: localDateString(),
       bankUpiId: bankUpiId.trim() || undefined,
     });
     setSubmitting(false);

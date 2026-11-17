@@ -27,6 +27,7 @@ import {
   PauseCircle,
   X,
 } from 'lucide-react-native';
+import { localDateString } from '../../src/utils/date';
 
 export default function EmployeeLeavesScreen() {
   const { user } = useAuth();
@@ -37,7 +38,7 @@ export default function EmployeeLeavesScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   // Dynamic default dates (Today)
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => localDateString(), []);
 
   const [leaveType, setLeaveType] = useState<LeaveType>('CASUAL');
   const [fromDate, setFromDate] = useState<string>(todayStr);

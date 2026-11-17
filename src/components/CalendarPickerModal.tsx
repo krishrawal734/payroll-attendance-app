@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Check, X } from 'lucide-react-native';
+import { localDateString } from '../utils/date';
 
 interface CalendarPickerModalProps {
   visible: boolean;
@@ -44,7 +45,7 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
   minDate,
   title = 'Select Date',
 }) => {
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => localDateString(), []);
   const initialDate = selectedDate || todayStr;
 
   const [pickedDate, setPickedDate] = useState<string>(initialDate);
@@ -308,7 +309,7 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                 ].map((preset) => {
                   const targetD = new Date();
                   targetD.setDate(targetD.getDate() + preset.days);
-                  const targetStr = targetD.toISOString().split('T')[0];
+                  const targetStr = localDateString(targetD);
                   const active = pickedDate === targetStr;
 
                   return (

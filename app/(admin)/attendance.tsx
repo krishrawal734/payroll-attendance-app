@@ -33,6 +33,7 @@ import {
   CalendarDays,
   CalendarRange,
 } from 'lucide-react-native';
+import { localDateString } from '../../src/utils/date';
 
 type PeriodType = 'MONTH' | 'WEEK' | 'TODAY' | 'NIGHT' | 'ALL';
 
@@ -47,14 +48,14 @@ export default function AdminAttendanceScreen() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportPeriod, setExportPeriod] = useState<PeriodType>('MONTH');
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateString();
   const currentMonth = today.slice(0, 7);
   const currentMonthName = new Date().toLocaleString('en-IN', { month: 'long', year: 'numeric' });
 
   // 7 days ago calculation
   const past7Date = new Date();
   past7Date.setDate(past7Date.getDate() - 6);
-  const past7DateStr = past7Date.toISOString().split('T')[0];
+  const past7DateStr = localDateString(past7Date);
 
   const loadData = async () => {
     try {

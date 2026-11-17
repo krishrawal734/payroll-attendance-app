@@ -10,6 +10,7 @@ import {
   AttendanceLocation,
 } from '../types';
 import { transactionMonth, salaryPaidForMonth, payslipStatus } from './payrollCalc';
+import { localDateString } from '../utils/date';
 
 export class DataService {
   isCloud(): boolean {
@@ -150,7 +151,7 @@ export class DataService {
       type: 'DEDUCTION',
       amount: due,
       paymentMode: 'CASH',
-      paymentDate: new Date().toISOString().split('T')[0],
+      paymentDate: localDateString(),
       notes: `Advance recovery for ${month}`,
     });
     return res.success ? res : { success: false, message: `Could not record advance recovery: ${res.message}` };

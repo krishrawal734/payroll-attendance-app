@@ -24,6 +24,7 @@ import {
   FileCheck2,
   BellRing,
 } from 'lucide-react-native';
+import { localDateString } from '../../src/utils/date';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -71,7 +72,7 @@ export default function AdminDashboard() {
     loadDashboard();
   }, []);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateString();
   const todayAttendance = attendance.filter((a) => a.date === today);
   const nightPresentCount = attendance.filter((a) => a.isNightPresent).length;
   const pendingLeaves = leaves.filter((l) => l.status === 'PENDING');

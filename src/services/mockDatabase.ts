@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { getNightAllowance } from './settingsService';
 import { computeFinancialSummary } from './payrollCalc';
+import { localDateString, localMonthString, previousLocalDateString } from '../utils/date';
 
 class MockDatabase {
   private employees: Employee[] = [];
@@ -72,14 +73,23 @@ class MockDatabase {
     return [...this.attendance];
   }
 
+  // Today's record, or last night's shift if it is still open (checked in, not out) after midnight.
   getTodayAttendance(employeeId: string): AttendanceRecord | undefined {
-    const today = new Date().toISOString().split('T')[0];
-    return this.attendance.find((a) => a.employeeId === employeeId && a.date === today);
+    const today = localDateString();
+    const yesterday = previousLocalDateString();
+    const mine = this.attendance.filter((a) => a.employeeId === employeeId);
+    return (
+      mine.find((a) => a.date === today) ??
+      mine.find((a) => a.date === yesterday && a.checkInTime && !a.checkOutTime)
+    );
   }
 
   checkIn(employeeId: string, location: AttendanceLocation): { success: boolean; record?: AttendanceRecord; message: string } {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateString();
     const existing = this.getTodayAttendance(employeeId);
+    if (existing && existing.date !== today) {
+      return { success: false, message: `Please check out of your shift from ${existing.date} first.` };
+    }
     if (existing && existing.checkInTime) {
       return { success: false, message: 'You have already checked in for today!' };
     }
@@ -106,7 +116,6 @@ class MockDatabase {
 
   // REQUIREMENT 1: If an employee checks out after 7:00 PM (19:00), automatically mark attendance as Night Present
   checkOut(employeeId: string, location: AttendanceLocation): { success: boolean; record?: AttendanceRecord; message: string } {
-    const today = new Date().toISOString().split('T')[0];
     const existing = this.getTodayAttendance(employeeId);
 
     if (!existing || !existing.checkInTime) {
@@ -119,9 +128,8 @@ class MockDatabase {
     const now = new Date();
     const checkOutIso = now.toISOString();
 
-    // Check if after 7:00 PM (19:00 hours in local time)
-    const hours = now.getHours();
-    const isNightPresent = hours >= 19; // 19:00 or later = 7:00 PM or later
+    // After 7:00 PM (local time), or a shift that ran past midnight into a later date.
+    const isNightPresent = now.getHours() >= 19 || existing.date !== localDateString(now);
 
     existing.checkOutTime = checkOutIso;
     existing.checkOutLocation = location;
@@ -189,7 +197,7 @@ class MockDatabase {
     const emp = this.getEmployeeById(employeeId);
     if (!emp) return null;
 
-    const targetMonth = monthYear || new Date().toISOString().slice(0, 7); // e.g. "2026-11"
+    const targetMonth = monthYear || localMonthString(); // e.g. "2026-11"
     return computeFinancialSummary(
       emp,
       this.getTransactions(employeeId),
