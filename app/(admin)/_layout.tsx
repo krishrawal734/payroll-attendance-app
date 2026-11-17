@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useRouter, Redirect } from 'expo-router';
 import { TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
 import {
   LayoutDashboard,
@@ -12,7 +12,7 @@ import {
 import { useAuth } from '../../src/store/authContext';
 
 export default function AdminLayout() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
 
   const handleLogout = () => {
@@ -28,6 +28,9 @@ export default function AdminLayout() {
       },
     ]);
   };
+
+  // Signed out elsewhere (e.g. deactivated while the app was open).
+  if (!user) return <Redirect href="/(auth)/login" />;
 
   return (
     <Tabs

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react-native';
 import { shareAttendanceReportPdf } from '../../src/services/pdfService';
 import { showActionMenu } from '../../src/utils/actionMenu';
+import { isMissedPunch } from '../../src/services/payrollCalc';
 import { localDateString } from '../../src/utils/date';
 
 export default function EmployeeAttendanceScreen() {
@@ -354,7 +355,11 @@ export default function EmployeeAttendanceScreen() {
                   <Calendar size={13} color="#64748b" />
                   <Text className="text-xs font-bold text-slate-800 ml-1.5">{record.date}</Text>
                 </View>
-                {record.status === 'ABSENT' ? (
+                {isMissedPunch(record) ? (
+                  <View className="bg-rose-100 px-2 py-0.5 rounded-full">
+                    <Text className="text-[10px] font-bold text-rose-700">Missed Punch-out • ask admin</Text>
+                  </View>
+                ) : record.status === 'ABSENT' ? (
                   <View className="bg-rose-100 px-2 py-0.5 rounded-full">
                     <Text className="text-[10px] font-bold text-rose-700">Short Shift (not counted)</Text>
                   </View>

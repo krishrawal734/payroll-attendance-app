@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState } from 'react-native';
 import { Employee } from '../types';
 import { db } from '../services/mockDatabase';
 import { dataService } from '../services/dataService';
@@ -41,9 +42,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await AsyncStorage.removeItem(USER_STORAGE_KEY);
             setUser(null);
           } else {
+            // Re-check the account so a deactivated employee loses access; offline keeps the cached session.
+            const fresh = await dataService.getEmployeeById(parsed.id);
+            if (fresh && !fresh.isActive) {
+              await AsyncStorage.removeItem(USER_STORAGE_KEY);
+              setUser(null);
+              return;
+            }
+            const current = fresh ?? parsed;
             await fetchNightAllowance();
-            setUser(parsed);
-            db.setCurrentUser(parsed);
+            setUser(current);
+            db.setCurrentUser(current);
+            if (fresh) await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(fresh));
           }
         }
       } catch (err) {
@@ -76,6 +86,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
     return res;
   };
+
+  // Each time the app returns to the foreground, sign out an employee who was deactivated meanwhile.
+  useEffect(() => {
+    if (!user) return;
+    const sub = AppState.addEventListener('change', async (state) => {
+      if (state !== 'active') return;
+      const fresh = await dataService.getEmployeeById(user.id).catch(() => undefined);
+      if (fresh && !fresh.isActive) await logout();
+    });
+    return () => sub.remove();
+  }, [user]);
 
   const logout = async () => {
     db.setCurrentUser(null);

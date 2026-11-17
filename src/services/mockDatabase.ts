@@ -8,7 +8,7 @@ import {
   EmployeeFinancialSummary,
 } from '../types';
 import { getNightAllowance, mockAttendanceRules } from './settingsService';
-import { computeFinancialSummary, shiftStatus, checkOutMessage } from './payrollCalc';
+import { computeFinancialSummary, shiftStatus, checkOutMessage, isNightShift, invalidCheckOut, isMissedPunch, MAX_OPEN_SHIFT_HOURS } from './payrollCalc';
 import { localDateString, localMonthString, previousLocalDateString } from '../utils/date';
 
 class MockDatabase {
@@ -51,6 +51,13 @@ class MockDatabase {
     return this.employees.find((e) => e.id === id);
   }
 
+  setEmployeeActive(id: string, isActive: boolean): { success: boolean; message: string } {
+    const emp = this.employees.find((e) => e.id === id);
+    if (!emp) return { success: false, message: 'Employee not found.' };
+    emp.isActive = isActive;
+    return { success: true, message: isActive ? 'Employee reactivated.' : 'Employee deactivated. They can no longer log in.' };
+  }
+
   addEmployee(data: Omit<Employee, 'id' | 'isActive'>): { success: boolean; employee?: Employee; message: string } {
     const existing = this.employees.find((e) => e.mobileNumber === data.mobileNumber);
     if (existing) {
@@ -80,7 +87,7 @@ class MockDatabase {
     const mine = this.attendance.filter((a) => a.employeeId === employeeId);
     return (
       mine.find((a) => a.date === today) ??
-      mine.find((a) => a.date === yesterday && a.checkInTime && !a.checkOutTime)
+      mine.find((a) => a.date === yesterday && a.checkInTime && !a.checkOutTime && !isMissedPunch(a))
     );
   }
 
@@ -115,6 +122,19 @@ class MockDatabase {
   }
 
   // REQUIREMENT 1: If an employee checks out after 7:00 PM (19:00), automatically mark attendance as Night Present
+  adminSetCheckOut(recordId: string, checkOutIso: string): { success: boolean; message: string } {
+    const rec = this.attendance.find((a) => a.id === recordId);
+    if (!rec || !rec.checkInTime) return { success: false, message: 'Attendance record not found.' };
+    const invalid = invalidCheckOut(rec.checkInTime, checkOutIso);
+    if (invalid) return { success: false, message: invalid };
+
+    rec.checkOutTime = checkOutIso;
+    rec.status = shiftStatus(rec.checkInTime, checkOutIso, mockAttendanceRules());
+    rec.isNightPresent = isNightShift(rec.status, rec.date, new Date(checkOutIso));
+    rec.notes = 'Check-out set by admin';
+    return { success: true, message: checkOutMessage(rec.status, rec.isNightPresent) };
+  }
+
   checkOut(employeeId: string, location: AttendanceLocation): { success: boolean; record?: AttendanceRecord; message: string } {
     const existing = this.getTodayAttendance(employeeId);
 
@@ -124,13 +144,15 @@ class MockDatabase {
     if (existing.checkOutTime) {
       return { success: false, message: 'You have already checked out for today.' };
     }
+    if (isMissedPunch(existing)) {
+      return { success: false, message: `This shift has been open for over ${MAX_OPEN_SHIFT_HOURS} hours. Ask your admin to set the real check-out time.` };
+    }
 
     const now = new Date();
     const checkOutIso = now.toISOString();
 
     const status = shiftStatus(existing.checkInTime, checkOutIso, mockAttendanceRules());
-    // After 7:00 PM (local time), or a shift that ran past midnight into a later date; too-short shifts earn nothing.
-    const isNightPresent = status !== 'ABSENT' && (now.getHours() >= 19 || existing.date !== localDateString(now));
+    const isNightPresent = isNightShift(status, existing.date, now);
 
     existing.checkOutTime = checkOutIso;
     existing.checkOutLocation = location;

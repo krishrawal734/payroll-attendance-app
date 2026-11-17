@@ -9,7 +9,7 @@ import {
   Payslip,
   AttendanceLocation,
 } from '../types';
-import { transactionMonth, salaryPaidForMonth, payslipStatus } from './payrollCalc';
+import { transactionMonth, salaryPaidForMonth, payslipStatus, OVERPAY_TRANSFER_NOTE } from './payrollCalc';
 import { localDateString } from '../utils/date';
 
 // Another of the employee's leaves (in the given statuses) sharing at least one day with `leave`.
@@ -54,6 +54,13 @@ export class DataService {
     return db.getEmployeeById(id);
   }
 
+  async setEmployeeActive(id: string, isActive: boolean): Promise<{ success: boolean; message: string }> {
+    if (this.isCloud()) {
+      return await supabaseService.setEmployeeActive(id, isActive);
+    }
+    return db.setEmployeeActive(id, isActive);
+  }
+
   async addEmployee(emp: Omit<Employee, 'id' | 'isActive'>): Promise<{ success: boolean; employee?: Employee; message: string }> {
     if (this.isCloud()) {
       return await supabaseService.addEmployee(emp);
@@ -82,6 +89,31 @@ export class DataService {
     }
     const res = db.checkIn(employeeId, loc);
     return { success: res.success, message: res.message };
+  }
+
+  async adminSetCheckOut(recordId: string, checkOutIso: string): Promise<{ success: boolean; message: string }> {
+    if (this.isCloud()) {
+      return await supabaseService.adminSetCheckOut(recordId, checkOutIso);
+    }
+    return db.adminSetCheckOut(recordId, checkOutIso);
+  }
+
+  // Moves a month's overpaid salary into the advance balance so it is recovered from future pay.
+  async moveOverpaymentToAdvance(employeeId: string, employeeName: string, month: string): Promise<{ success: boolean; message: string }> {
+    const fin = await this.getEmployeeFinancialSummary(employeeId, month);
+    if (!fin || fin.overpaidAmount <= 0) return { success: false, message: `Nothing is overpaid for ${month}.` };
+    const res = await this.insertTransaction({
+      employeeId,
+      employeeName,
+      type: 'ADVANCE_PAID',
+      amount: fin.overpaidAmount,
+      paymentMode: 'CASH',
+      paymentDate: localDateString(),
+      notes: `${OVERPAY_TRANSFER_NOTE} ${month}`,
+    });
+    return res.success
+      ? { success: true, message: `₹${fin.overpaidAmount.toLocaleString('en-IN')} moved to advance. It will be recovered from future salary.` }
+      : res;
   }
 
   async checkOut(employeeId: string, loc: AttendanceLocation): Promise<{ success: boolean; isNightPresent?: boolean; message: string }> {

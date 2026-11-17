@@ -31,6 +31,7 @@ export default function AdminEmployeesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -120,11 +121,13 @@ export default function AdminEmployeesScreen() {
     }
   };
 
+  const inactiveCount = employees.filter((emp) => !emp.isActive).length;
   const filtered = employees.filter(
     (emp) =>
-      emp.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      emp.mobileNumber.includes(searchQuery) ||
-      emp.designation.toLowerCase().includes(searchQuery.toLowerCase())
+      (showInactive || emp.isActive) &&
+      (emp.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        emp.mobileNumber.includes(searchQuery) ||
+        emp.designation.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -163,8 +166,15 @@ export default function AdminEmployeesScreen() {
         >
           <View className="flex-row justify-between items-center mb-3">
             <Text className="text-xs font-extrabold text-slate-400 uppercase tracking-wider">
-              Registered Workforce ({filtered.length})
+              {showInactive ? 'All Staff' : 'Registered Workforce'} ({filtered.length})
             </Text>
+            {inactiveCount > 0 && (
+              <TouchableOpacity onPress={() => setShowInactive(!showInactive)}>
+                <Text className="text-[10px] font-bold text-indigo-600">
+                  {showInactive ? 'Hide former staff' : `Show former staff (${inactiveCount})`}
+                </Text>
+              </TouchableOpacity>
+            )}
             {dataService.isCloud() && (
               <Text className="text-[10px] font-bold text-emerald-600">🟢 Cloud Synced</Text>
             )}
@@ -197,7 +207,10 @@ export default function AdminEmployeesScreen() {
                     </View>
 
                     <View className="flex-1">
-                      <Text className="text-sm font-bold text-slate-900">{emp.fullName}</Text>
+                      <Text className="text-sm font-bold text-slate-900">
+                        {emp.fullName}
+                        {!emp.isActive && <Text className="text-[10px] font-bold text-rose-600">  INACTIVE</Text>}
+                      </Text>
                       <View className="flex-row items-center mt-1">
                         <Briefcase size={11} color="#64748b" />
                         <Text className="text-[11px] text-slate-500 ml-1">{emp.designation}</Text>

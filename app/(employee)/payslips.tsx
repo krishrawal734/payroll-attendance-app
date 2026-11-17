@@ -18,6 +18,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
 } from 'lucide-react-native';
+import { isOverpayTransfer } from '../../src/services/payrollCalc';
 
 export default function EmployeePayslipsScreen() {
   const { user } = useAuth();
@@ -201,7 +202,9 @@ export default function EmployeePayslipsScreen() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-xs font-bold text-slate-900">
-                    {tx.type === 'ADVANCE_PAID'
+                    {isOverpayTransfer(tx)
+                      ? 'Overpaid Salary → Advance'
+                      : tx.type === 'ADVANCE_PAID'
                       ? 'Advance Received'
                       : tx.type === 'DEDUCTION'
                       ? 'Advance Recovered from Salary'

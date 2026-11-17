@@ -34,6 +34,7 @@ import {
   CalendarRange,
 } from 'lucide-react-native';
 import { localDateString } from '../../src/utils/date';
+import { isMissedPunch } from '../../src/services/payrollCalc';
 
 type PeriodType = 'MONTH' | 'WEEK' | 'TODAY' | 'NIGHT' | 'ALL';
 
@@ -46,6 +47,10 @@ export default function AdminAttendanceScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [fixRecord, setFixRecord] = useState<AttendanceRecord | null>(null);
+  const [fixTime, setFixTime] = useState('18:00');
+  const [fixNextDay, setFixNextDay] = useState(false);
+  const [savingFix, setSavingFix] = useState(false);
   const [exportPeriod, setExportPeriod] = useState<PeriodType>('MONTH');
 
   const today = localDateString();
@@ -195,6 +200,33 @@ export default function AdminAttendanceScreen() {
   const openExportModal = (initialPeriod?: PeriodType) => {
     setExportPeriod(initialPeriod || filter);
     setShowExportModal(true);
+  };
+
+
+  const openFixCheckOut = (record: AttendanceRecord) => {
+    setFixRecord(record);
+    setFixTime('18:00');
+    setFixNextDay(false);
+  };
+
+  // Admin enters the real check-out time (24h HH:MM) for a shift the employee forgot to close.
+  const handleSaveCheckOut = async () => {
+    if (!fixRecord) return;
+    const match = fixTime.trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) {
+      Alert.alert('Invalid Time', 'Enter the check-out time as HH:MM in 24-hour format, e.g. 18:30.');
+      return;
+    }
+    const [y, m, d] = fixRecord.date.split('-').map(Number);
+    const checkOut = new Date(y, m - 1, d + (fixNextDay ? 1 : 0), Number(match[1]), Number(match[2]));
+    setSavingFix(true);
+    const res = await dataService.adminSetCheckOut(fixRecord.id, checkOut.toISOString());
+    setSavingFix(false);
+    Alert.alert(res.success ? 'Check-out Saved' : 'Error', res.message);
+    if (res.success) {
+      setFixRecord(null);
+      await loadData();
+    }
   };
 
   return (
@@ -372,7 +404,11 @@ export default function AdminAttendanceScreen() {
                       </View>
                     </View>
 
-                    {record.status === 'ABSENT' ? (
+                    {isMissedPunch(record) ? (
+                      <View className="flex-row items-center bg-rose-100 px-2 py-0.5 rounded-full">
+                        <Text className="text-[10px] font-bold text-rose-700">Missed Punch-out (not paid)</Text>
+                      </View>
+                    ) : record.status === 'ABSENT' ? (
                       <View className="flex-row items-center bg-rose-100 px-2 py-0.5 rounded-full">
                         <Text className="text-[10px] font-bold text-rose-700">Short Shift (not counted)</Text>
                       </View>
@@ -415,6 +451,8 @@ export default function AdminAttendanceScreen() {
                       >
                         {record.checkOutTime
                           ? new Date(record.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : isMissedPunch(record)
+                          ? 'Not checked out'
                           : 'Currently Working'}
                       </Text>
                     </View>
@@ -428,6 +466,15 @@ export default function AdminAttendanceScreen() {
                         {record.checkInLocation.address}
                       </Text>
                     </View>
+                  )}
+
+                  {isMissedPunch(record) && (
+                    <TouchableOpacity
+                      className="mt-2.5 bg-rose-600 rounded-xl py-2 items-center"
+                      onPress={() => openFixCheckOut(record)}
+                    >
+                      <Text className="text-white text-xs font-bold">Set Check-out Time</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               );
@@ -668,6 +715,52 @@ export default function AdminAttendanceScreen() {
                 <Text className="text-white text-sm font-black ml-2">
                   Export Excel / CSV Spreadsheet
                 </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Admin fix for a missed punch-out */}
+      <Modal visible={!!fixRecord} transparent animationType="fade" onRequestClose={() => setFixRecord(null)}>
+        <View className="flex-1 bg-black/50 justify-center p-6">
+          <View className="bg-white rounded-3xl p-5">
+            <Text className="text-base font-black text-slate-900">Set Check-out Time</Text>
+            <Text className="text-xs text-slate-500 mt-1 mb-4">
+              {employees.find((e) => e.id === fixRecord?.employeeId)?.fullName || 'Employee'} • shift of {fixRecord?.date}
+              {fixRecord?.checkInTime
+                ? `, checked in ${new Date(fixRecord.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                : ''}
+            </Text>
+            <Text className="text-[11px] font-bold text-slate-600 mb-1.5">Check-out time (24h, HH:MM)</Text>
+            <TextInput
+              className="border border-slate-300 rounded-xl px-3.5 py-3 text-base font-semibold text-slate-900 mb-3"
+              value={fixTime}
+              onChangeText={setFixTime}
+              placeholder="18:30"
+              keyboardType="numbers-and-punctuation"
+              maxLength={5}
+            />
+            <TouchableOpacity className="flex-row items-center mb-5" onPress={() => setFixNextDay(!fixNextDay)}>
+              <View
+                className={`w-5 h-5 rounded-md border mr-2 items-center justify-center ${
+                  fixNextDay ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'
+                }`}
+              >
+                {fixNextDay && <Check size={12} color="#ffffff" />}
+              </View>
+              <Text className="text-xs text-slate-700">Checked out the next day (overnight shift)</Text>
+            </TouchableOpacity>
+            <View className="flex-row">
+              <TouchableOpacity className="flex-1 py-3 rounded-xl border border-slate-300 items-center mr-2" onPress={() => setFixRecord(null)}>
+                <Text className="text-xs font-bold text-slate-700">Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 py-3 rounded-xl bg-indigo-600 items-center"
+                onPress={handleSaveCheckOut}
+                disabled={savingFix}
+              >
+                {savingFix ? <ActivityIndicator size="small" color="#ffffff" /> : <Text className="text-xs font-bold text-white">Save</Text>}
               </TouchableOpacity>
             </View>
           </View>

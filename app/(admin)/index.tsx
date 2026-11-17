@@ -46,7 +46,7 @@ export default function AdminDashboard() {
         dataService.getTransactions(),
       ]);
 
-      const staff = allEmps.filter((e) => e.role === 'employee');
+      const staff = allEmps.filter((e) => e.role === 'employee' && e.isActive);
       setEmployees(staff);
       setAttendance(atts);
       setLeaves(lvs);

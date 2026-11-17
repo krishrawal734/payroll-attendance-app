@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useRouter, Redirect } from 'expo-router';
 import { TouchableOpacity, Text, View, StyleSheet, Alert } from 'react-native';
 import { LayoutDashboard, Clock, CalendarDays, FileSpreadsheet, LogOut } from 'lucide-react-native';
 import { useAuth } from '../../src/store/authContext';
@@ -21,6 +21,9 @@ export default function EmployeeLayout() {
       },
     ]);
   };
+
+  // Signed out elsewhere (e.g. deactivated while the app was open).
+  if (!user) return <Redirect href="/(auth)/login" />;
 
   return (
     <Tabs

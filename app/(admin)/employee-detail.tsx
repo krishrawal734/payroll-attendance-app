@@ -24,6 +24,7 @@ import {
   ChevronLeft,
 } from 'lucide-react-native';
 import { localDateString } from '../../src/utils/date';
+import { isOverpayTransfer } from '../../src/services/payrollCalc';
 
 export default function EmployeeDetailScreen() {
   const router = useRouter();
@@ -132,6 +133,28 @@ export default function EmployeeDetailScreen() {
     }
   };
 
+  const handleToggleActive = () => {
+    const deactivating = employee.isActive;
+    Alert.alert(
+      deactivating ? 'Deactivate employee?' : 'Reactivate employee?',
+      deactivating
+        ? `${employee.fullName} will be signed out and can no longer log in. Their attendance, leave and payment history is kept.`
+        : `${employee.fullName} will be able to log in again.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: deactivating ? 'Deactivate' : 'Reactivate',
+          style: deactivating ? 'destructive' : 'default',
+          onPress: async () => {
+            const res = await dataService.setEmployeeActive(employee.id, !deactivating);
+            Alert.alert(res.success ? 'Done' : 'Error', res.message);
+            if (res.success) await loadData();
+          },
+        },
+      ]
+    );
+  };
+
   const openUpiIntent = () => {
     if (!employee.bankUpiId) {
       Alert.alert('No UPI ID', 'This employee has no registered UPI ID.');
@@ -164,7 +187,10 @@ export default function EmployeeDetailScreen() {
             </Text>
           </View>
           <View className="flex-1">
-            <Text className="text-base font-black text-slate-900">{employee.fullName}</Text>
+            <Text className="text-base font-black text-slate-900">
+              {employee.fullName}
+              {!employee.isActive && <Text className="text-xs font-bold text-rose-600">  (Inactive)</Text>}
+            </Text>
             <Text className="text-xs text-slate-500 mt-0.5">{employee.designation}</Text>
             <Text className="text-xs text-indigo-600 font-bold mt-0.5">+91 {employee.mobileNumber}</Text>
           </View>
@@ -233,6 +259,17 @@ export default function EmployeeDetailScreen() {
         </TouchableOpacity>
       </View>
 
+      <TouchableOpacity
+        className={`rounded-xl py-3 items-center mb-5 border ${
+          employee.isActive ? 'border-rose-200 bg-rose-50' : 'border-emerald-200 bg-emerald-50'
+        }`}
+        onPress={handleToggleActive}
+      >
+        <Text className={`text-xs font-bold ${employee.isActive ? 'text-rose-600' : 'text-emerald-700'}`}>
+          {employee.isActive ? 'Deactivate Employee (left the company)' : 'Reactivate Employee'}
+        </Text>
+      </TouchableOpacity>
+
       {/* Complete Transaction & Advance Ledger History */}
       <Text className="text-base font-extrabold text-slate-900 mb-3">
         Payment & Advance Ledger ({transactions.length})
@@ -263,7 +300,9 @@ export default function EmployeeDetailScreen() {
 
               <View className="flex-1">
                 <Text className="text-xs font-bold text-slate-900">
-                  {tx.type === 'ADVANCE_PAID'
+                  {isOverpayTransfer(tx)
+                    ? 'Overpaid Salary → Advance'
+                    : tx.type === 'ADVANCE_PAID'
                     ? 'Advance Disbursed'
                     : tx.type === 'SALARY_PAYMENT'
                     ? 'Salary Disbursed'

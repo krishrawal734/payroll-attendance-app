@@ -108,7 +108,16 @@ export default function AdminPayrollScreen() {
     loadData(selectedMonth);
   }, [selectedMonth]);
 
-  const staff = employees.filter((e) => e.role === 'employee');
+  // Former staff stay listed only while they are still owed money for the month (final settlement).
+  const staff = employees.filter(
+    (e) =>
+      e.role === 'employee' &&
+      (e.isActive ||
+        remainingPayable(
+          summaries[e.id],
+          allPayslips.find((p) => p.employeeId === e.id && p.monthYear === selectedMonth)
+        ) > 0)
+  );
 
   // Compute Grand Financial Totals for Executive Banner
   let totalGross = 0;
@@ -247,6 +256,25 @@ export default function AdminPayrollScreen() {
     );
     setPayAmount(String(remainingPayable(fin, payslip)));
     setPaymentModalVisible(true);
+  };
+
+  const handleMoveOverpayment = (emp: Employee, amount: number) => {
+    Alert.alert(
+      'Move overpayment to advance?',
+      `${emp.fullName} was paid ₹${amount.toLocaleString('en-IN')} more than earned for ${selectedMonth}. ` +
+        'Moving it to advance means it will be recovered automatically from future salary.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Move to Advance',
+          onPress: async () => {
+            const res = await dataService.moveOverpaymentToAdvance(emp.id, emp.fullName, selectedMonth);
+            Alert.alert(res.success ? 'Done' : 'Error', res.message);
+            if (res.success) await loadData(selectedMonth);
+          },
+        },
+      ]
+    );
   };
 
   const handleConfirmDisbursal = async () => {
@@ -586,6 +614,27 @@ export default function AdminPayrollScreen() {
                       </Text>
                     </View>
                   </View>
+
+                  {(fin?.overpaidAmount || 0) > 0 && (
+                    <View className="flex-row items-center justify-between bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-3">
+                      <Text className="text-[11px] font-bold text-rose-700 flex-1 mr-2">
+                        Overpaid ₹{fin.overpaidAmount.toLocaleString('en-IN')} this month
+                      </Text>
+                      <TouchableOpacity
+                        className="bg-rose-600 rounded-lg px-2.5 py-1.5"
+                        onPress={() => handleMoveOverpayment(emp, fin.overpaidAmount)}
+                      >
+                        <Text className="text-white text-[10px] font-bold">Move to advance</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {(fin?.missedPunchDays || 0) > 0 && (
+                    <View className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
+                      <Text className="text-[11px] font-bold text-amber-700">
+                        {fin.missedPunchDays} missed punch-out(s) not paid. Fix them in Attendance.
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Action Buttons */}
                   <View className="flex-row space-x-2">

@@ -101,4 +101,6 @@ export interface EmployeeFinancialSummary {
   advanceRecoveredThisMonth: number; // part of advanceDeduction already recorded as DEDUCTION
   salaryPaidThisMonth: number;
   pendingPayable: number; // still owed for the month after recovery and payments
+  overpaidAmount: number; // salary paid for the month beyond what was earned
+  missedPunchDays: number; // past shifts never checked out (not paid until fixed)
 }

@@ -38,6 +38,10 @@ Choice is made by `isSupabaseConfigured()` in `src/config/supabaseConfig.ts`. No
 
 **Check-out rules** (`checkOut` in both backends): status from `shiftStatus`; Night Present if checkout ≥ 19:00 local or the shift ran past midnight, and only if not ABSENT. `getTodayAttendance` returns today's record or yesterday's still-open shift. Leave validation (no overlaps; approval can't overlap another approved leave) is in `dataService`.
 
+**Missed punch-out:** an open shift older than `MAX_OPEN_SHIFT_HOURS` (16h) is `isMissedPunch` — not paid, employee check-out refused, and only `dataService.adminSetCheckOut` (admin Attendance → "Set Check-out Time") closes it. **Overpayment:** `overpaidAmount` in the summary; "Move to advance" writes an ADVANCE_PAID whose notes start with `OVERPAY_TRANSFER_NOTE`, which also cancels that much salary for the month.
+
+**Inactive staff** (`is_active = false`, toggled in employee detail): can't log in, are signed out on app start/foreground, hidden from Staff (toggle) and dashboard, and listed in payroll only while still owed money.
+
 **Dates:** always use `localDateString()` / `localMonthString()` from `src/utils/date.ts`, never `toISOString().split('T')[0]` (that is the UTC date — wrong in India before 5:30 AM).
 
 **Android alerts** show at most 3 buttons; use `showActionMenu` (`src/utils/actionMenu.ts`) for longer menus.

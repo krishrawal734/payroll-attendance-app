@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { db } from './mockDatabase';
 import { fetchNightAllowance, fetchAttendanceRules } from './settingsService';
-import { computeFinancialSummary, shiftStatus, checkOutMessage } from './payrollCalc';
+import { computeFinancialSummary, shiftStatus, checkOutMessage, isNightShift, invalidCheckOut, isMissedPunch, MAX_OPEN_SHIFT_HOURS } from './payrollCalc';
 import {
   Employee,
   AttendanceRecord,
@@ -101,6 +101,14 @@ export class SupabaseService {
       bankUpiId: data.bank_upi_id,
       isActive: data.is_active,
     };
+  }
+
+  async setEmployeeActive(id: string, isActive: boolean): Promise<{ success: boolean; message: string }> {
+    if (!this.isUUID(id)) return db.setEmployeeActive(id, isActive);
+    const { data, error } = await supabase.from('employees').update({ is_active: isActive }).eq('id', id).select('id');
+    if (error) return { success: false, message: error.message };
+    if (!data || data.length === 0) return { success: false, message: 'Employee was not updated (not found or no permission).' };
+    return { success: true, message: isActive ? 'Employee reactivated.' : 'Employee deactivated. They can no longer log in.' };
   }
 
   async addEmployee(emp: Omit<Employee, 'id' | 'isActive'>): Promise<{ success: boolean; employee?: Employee; message: string }> {
@@ -206,7 +214,13 @@ export class SupabaseService {
     if (error || !rows) return undefined;
     const data =
       rows.find((r: any) => r.date === today) ??
-      rows.find((r: any) => r.date === yesterday && r.check_in_time && !r.check_out_time);
+      rows.find(
+        (r: any) =>
+          r.date === yesterday &&
+          r.check_in_time &&
+          !r.check_out_time &&
+          !isMissedPunch({ checkInTime: r.check_in_time, checkOutTime: r.check_out_time })
+      );
     if (!data) return undefined;
     return {
       id: data.id,
@@ -278,6 +292,27 @@ export class SupabaseService {
     return { success: true, message: 'Checked in to Supabase cloud successfully!' };
   }
 
+  // Admin closes a shift the employee forgot to check out of.
+  async adminSetCheckOut(recordId: string, checkOutIso: string): Promise<{ success: boolean; message: string }> {
+    if (!this.isUUID(recordId)) return db.adminSetCheckOut(recordId, checkOutIso);
+
+    const { data: rec, error: readError } = await supabase.from('attendance').select('*').eq('id', recordId).maybeSingle();
+    if (readError || !rec) return { success: false, message: 'Attendance record not found.' };
+    const invalid = invalidCheckOut(rec.check_in_time, checkOutIso);
+    if (invalid) return { success: false, message: invalid };
+
+    const status = shiftStatus(rec.check_in_time, checkOutIso, await fetchAttendanceRules());
+    const isNightPresent = isNightShift(status, rec.date, new Date(checkOutIso));
+    const { data, error } = await supabase
+      .from('attendance')
+      .update({ check_out_time: checkOutIso, status, is_night_present: isNightPresent, notes: 'Check-out set by admin' })
+      .eq('id', recordId)
+      .select('id');
+    if (error) return { success: false, message: error.message };
+    if (!data || data.length === 0) return { success: false, message: 'Attendance was not updated (no permission).' };
+    return { success: true, message: checkOutMessage(status, isNightPresent) };
+  }
+
   async checkOut(employeeId: string, loc: AttendanceLocation): Promise<{ success: boolean; isNightPresent?: boolean; message: string }> {
     const now = new Date();
 
@@ -293,10 +328,12 @@ export class SupabaseService {
     if (existing.checkOutTime) {
       return { success: false, message: 'You have already checked out for today.' };
     }
+    if (isMissedPunch(existing)) {
+      return { success: false, message: `This shift has been open for over ${MAX_OPEN_SHIFT_HOURS} hours. Ask your admin to set the real check-out time.` };
+    }
 
     const status = shiftStatus(existing.checkInTime, now.toISOString(), await fetchAttendanceRules());
-    // After 7:00 PM, or a shift that ran past midnight into a later date; too-short shifts earn nothing.
-    const isNightPresent = status !== 'ABSENT' && (now.getHours() >= 19 || existing.date !== localDateString(now));
+    const isNightPresent = isNightShift(status, existing.date, now);
 
     const { error } = await supabase
       .from('attendance')
