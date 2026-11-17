@@ -374,7 +374,7 @@ export class SupabaseService {
     ]);
 
     if (error) return { success: false, message: error.message };
-    return { success: true, message: 'Leave request saved to cloud database.' };
+    return { success: true, message: 'Leave application submitted successfully.' };
   }
 
   async updateLeaveStatus(leaveId: string, status: 'APPROVED' | 'REJECTED', adminRemark?: string): Promise<{ success: boolean; message: string }> {

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   StyleSheet,
+  Modal,
 } from 'react-native';
 import { useAuth } from '../../src/store/authContext';
 import { dataService } from '../../src/services/dataService';
@@ -44,6 +45,12 @@ export default function EmployeeLeavesScreen() {
   const [reason, setReason] = useState('');
   const [activeDatePicker, setActiveDatePicker] = useState<'FROM' | 'TO' | null>(null);
   const [filterTab, setFilterTab] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [successModalData, setSuccessModalData] = useState<{
+    leaveType: LeaveType;
+    fromDate: string;
+    toDate: string;
+    days: number;
+  } | null>(null);
 
   const loadLeaves = async () => {
     if (!user) return;
@@ -130,12 +137,17 @@ export default function EmployeeLeavesScreen() {
     setSubmitting(false);
 
     if (res.success) {
-      Alert.alert('Request Submitted', res.message);
+      setSuccessModalData({
+        leaveType,
+        fromDate,
+        toDate,
+        days: totalDays,
+      });
       setReason('');
       setShowForm(false);
       await loadLeaves();
     } else {
-      Alert.alert('Error', res.message);
+      Alert.alert('Submission Error', res.message || 'Unable to submit leave request.');
     }
   };
 
@@ -361,6 +373,76 @@ export default function EmployeeLeavesScreen() {
           }
         }}
       />
+
+      {/* Leave Application Success Modal */}
+      <Modal
+        visible={successModalData !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSuccessModalData(null)}
+      >
+        <View style={styles.successBackdrop}>
+          <View style={styles.successCard}>
+            {/* Success Icon */}
+            <View style={styles.successIconOuter}>
+              <View style={styles.successIconInner}>
+                <CheckCircle2 size={36} color="#ffffff" />
+              </View>
+            </View>
+
+            {/* Title & Subtitle */}
+            <Text style={styles.successTitle}>Successfully Applied!</Text>
+            <Text style={styles.successSubtitle}>
+              Your leave request has been submitted and is pending admin approval.
+            </Text>
+
+            {/* Summary Details Box */}
+            {successModalData && (
+              <View style={styles.successDetailsBox}>
+                <View style={styles.successDetailRow}>
+                  <Text style={styles.successDetailLabel}>Category</Text>
+                  <View style={styles.successCategoryPill}>
+                    <Text style={styles.successCategoryText}>
+                      {successModalData.leaveType} LEAVE
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.successDetailRow}>
+                  <Text style={styles.successDetailLabel}>Date Period</Text>
+                  <Text style={styles.successDetailVal}>
+                    {formatDateDetails(successModalData.fromDate).formatted} → {formatDateDetails(successModalData.toDate).formatted}
+                  </Text>
+                </View>
+
+                <View style={styles.successDetailRow}>
+                  <Text style={styles.successDetailLabel}>Total Duration</Text>
+                  <Text style={styles.successDetailVal}>
+                    {successModalData.days} {successModalData.days === 1 ? 'Day' : 'Days'}
+                  </Text>
+                </View>
+
+                <View style={[styles.successDetailRow, { borderBottomWidth: 0 }]}>
+                  <Text style={styles.successDetailLabel}>Approval Status</Text>
+                  <View style={styles.successStatusPill}>
+                    <Clock size={11} color="#d97706" />
+                    <Text style={styles.successStatusText}>Pending Approval</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Action Button */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.successDoneBtn}
+              onPress={() => setSuccessModalData(null)}
+            >
+              <Text style={styles.successDoneBtnText}>Great, Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Leave Application History Header */}
       <View style={styles.historyHeaderRow}>
@@ -1099,5 +1181,124 @@ const styles = StyleSheet.create({
     color: '#1e293b',
     fontWeight: '600',
     marginTop: 2,
+  },
+  successBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  successCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 28,
+    width: '100%',
+    maxWidth: 360,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  successIconOuter: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#ecfdf5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  successIconInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#10b981',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0f172a',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  successSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 18,
+    paddingHorizontal: 8,
+  },
+  successDetailsBox: {
+    width: '100%',
+    backgroundColor: '#f8fafc',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 20,
+  },
+  successDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  successDetailLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  successDetailVal: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  successCategoryPill: {
+    backgroundColor: '#eef2ff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+  },
+  successCategoryText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#4338ca',
+  },
+  successStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fffbeb',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  successStatusText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#b45309',
+    marginLeft: 4,
+  },
+  successDoneBtn: {
+    width: '100%',
+    backgroundColor: '#10b981',
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successDoneBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '900',
   },
 });
