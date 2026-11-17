@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  StyleSheet,
 } from 'react-native';
 import { useAuth } from '../../src/store/authContext';
 import { dataService } from '../../src/services/dataService';
@@ -34,7 +35,7 @@ export default function EmployeeLeavesScreen() {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Dynamic default dates (Today and Tomorrow)
+  // Dynamic default dates (Today)
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
   const [leaveType, setLeaveType] = useState<LeaveType>('CASUAL');
@@ -140,68 +141,64 @@ export default function EmployeeLeavesScreen() {
 
   return (
     <ScrollView
-      className="flex-1 bg-slate-50"
-      contentContainerClassName="p-4 pb-12"
+      style={styles.screen}
+      contentContainerStyle={styles.contentContainer}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       {/* Executive Leave Summary Banner */}
-      <View className="bg-slate-900 rounded-3xl p-5 mb-4 shadow-sm border border-slate-800">
-        <View className="flex-row justify-between items-center mb-3">
-          <View className="flex-row items-center">
+      <View style={styles.summaryBanner}>
+        <View style={styles.summaryHeaderRow}>
+          <View style={styles.summaryTitleWrap}>
             <CalendarPlus size={16} color="#818cf8" />
-            <Text className="text-indigo-300 text-xs font-black uppercase tracking-wider ml-1.5">
-              My Leaves Overview
-            </Text>
+            <Text style={styles.summaryTitleText}>My Leaves Overview</Text>
           </View>
-          <View className="bg-indigo-950 px-2.5 py-0.5 rounded-full border border-indigo-700">
-            <Text className="text-[10px] font-bold text-indigo-300">
+          <View style={styles.monthBadge}>
+            <Text style={styles.monthBadgeText}>
               {new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' })}
             </Text>
           </View>
         </View>
 
-        <View className="flex-row justify-between items-center bg-slate-800 rounded-2xl p-3 border border-slate-700">
-          <View className="items-center flex-1 border-r border-slate-700">
-            <Text className="text-white text-xl font-black">{leaves.length}</Text>
-            <Text className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Applied</Text>
+        <View style={styles.summaryStatsRow}>
+          <View style={[styles.statCol, styles.statBorderRight]}>
+            <Text style={styles.statValWhite}>{leaves.length}</Text>
+            <Text style={styles.statLabel}>Applied</Text>
           </View>
-          <View className="items-center flex-1 border-r border-slate-700">
-            <Text className="text-emerald-400 text-xl font-black">{approvedLeaves.length}</Text>
-            <Text className="text-[10px] font-bold text-emerald-400 uppercase mt-0.5">Approved</Text>
+          <View style={[styles.statCol, styles.statBorderRight]}>
+            <Text style={styles.statValEmerald}>{approvedLeaves.length}</Text>
+            <Text style={styles.statLabelEmerald}>Approved</Text>
           </View>
-          <View className="items-center flex-1 border-r border-slate-700">
-            <Text className="text-amber-400 text-xl font-black">{pendingLeaves.length}</Text>
-            <Text className="text-[10px] font-bold text-amber-400 uppercase mt-0.5">Pending</Text>
+          <View style={[styles.statCol, styles.statBorderRight]}>
+            <Text style={styles.statValAmber}>{pendingLeaves.length}</Text>
+            <Text style={styles.statLabelAmber}>Pending</Text>
           </View>
-          <View className="items-center flex-1">
-            <Text className="text-rose-400 text-xl font-black">{rejectedLeaves.length}</Text>
-            <Text className="text-[10px] font-bold text-rose-400 uppercase mt-0.5">Rejected</Text>
+          <View style={styles.statCol}>
+            <Text style={styles.statValRose}>{rejectedLeaves.length}</Text>
+            <Text style={styles.statLabelRose}>Rejected</Text>
           </View>
         </View>
       </View>
 
       {/* Top Action Card */}
-      <View className="flex-row justify-between items-center bg-white rounded-2xl p-4 border border-slate-200 mb-4 shadow-sm">
-        <View className="flex-1 mr-2">
-          <Text className="text-base font-extrabold text-slate-900">Apply for Time-Off</Text>
-          <Text className="text-xs text-slate-500 mt-0.5">Submit request for admin approval</Text>
+      <View style={styles.topActionCard}>
+        <View style={styles.topActionTextWrap}>
+          <Text style={styles.topActionTitle}>Apply for Time-Off</Text>
+          <Text style={styles.topActionSubtitle}>Submit request for admin approval</Text>
         </View>
         <TouchableOpacity
           activeOpacity={0.7}
-          className={`flex-row items-center px-4 py-2.5 rounded-xl ${
-            showForm ? 'bg-slate-200' : 'bg-indigo-600'
-          }`}
+          style={[styles.toggleFormBtn, showForm ? styles.toggleFormBtnClose : styles.toggleFormBtnNew]}
           onPress={() => setShowForm(!showForm)}
         >
           {showForm ? (
             <>
-              <X size={14} color="#334155" />
-              <Text className="text-slate-700 text-xs font-black ml-1.5">Close</Text>
+              <X size={15} color="#334155" />
+              <Text style={styles.toggleFormTextClose}>Close</Text>
             </>
           ) : (
             <>
-              <CalendarPlus size={14} color="#ffffff" />
-              <Text className="text-white text-xs font-black ml-1.5">New Request</Text>
+              <CalendarPlus size={15} color="#ffffff" />
+              <Text style={styles.toggleFormTextNew}>New Request</Text>
             </>
           )}
         </TouchableOpacity>
@@ -209,20 +206,20 @@ export default function EmployeeLeavesScreen() {
 
       {/* Apply Leave Form */}
       {showForm && (
-        <View className="bg-white rounded-3xl p-5 border border-indigo-100 mb-5 shadow-sm">
-          <View className="flex-row justify-between items-center mb-4">
+        <View style={styles.formCard}>
+          <View style={styles.formHeaderRow}>
             <View>
-              <Text className="text-sm font-black text-slate-900">New Leave Application</Text>
-              <Text className="text-[11px] text-slate-500 mt-0.5">Choose leave category and date range</Text>
+              <Text style={styles.formTitle}>New Leave Application</Text>
+              <Text style={styles.formSubtitle}>Choose category and select date range</Text>
             </View>
-            <View className="bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">
-              <Text className="text-[10px] font-bold text-indigo-700">{user.fullName}</Text>
+            <View style={styles.userNameBadge}>
+              <Text style={styles.userNameBadgeText}>{user.fullName}</Text>
             </View>
           </View>
 
           {/* Leave Type Selector */}
-          <Text className="text-xs font-bold text-slate-700 mb-2">Select Leave Type</Text>
-          <View className="flex-row mb-4">
+          <Text style={styles.inputSectionLabel}>Select Leave Type</Text>
+          <View style={styles.leaveTypeRow}>
             {[
               { type: 'CASUAL' as LeaveType, label: 'Casual', icon: Coffee, desc: 'Personal' },
               { type: 'SICK' as LeaveType, label: 'Sick', icon: Stethoscope, desc: 'Medical' },
@@ -236,25 +233,16 @@ export default function EmployeeLeavesScreen() {
                   key={item.type}
                   activeOpacity={0.7}
                   onPress={() => setLeaveType(item.type)}
-                  className={`flex-1 p-3 rounded-2xl border items-center mr-2 last:mr-0 ${
-                    active
-                      ? 'bg-indigo-600 border-indigo-600 shadow-sm'
-                      : 'bg-slate-50 border-slate-200'
-                  }`}
+                  style={[
+                    styles.typeCard,
+                    active ? styles.typeCardActive : styles.typeCardInactive,
+                  ]}
                 >
                   <IconComp size={18} color={active ? '#ffffff' : '#64748b'} />
-                  <Text
-                    className={`text-xs font-black mt-1.5 ${
-                      active ? 'text-white' : 'text-slate-800'
-                    }`}
-                  >
+                  <Text style={[styles.typeLabel, active ? styles.typeLabelActive : styles.typeLabelInactive]}>
                     {item.label}
                   </Text>
-                  <Text
-                    className={`text-[9px] font-semibold mt-0.5 ${
-                      active ? 'text-indigo-200' : 'text-slate-400'
-                    }`}
-                  >
+                  <Text style={[styles.typeDesc, active ? styles.typeDescActive : styles.typeDescInactive]}>
                     {item.desc}
                   </Text>
                 </TouchableOpacity>
@@ -263,32 +251,26 @@ export default function EmployeeLeavesScreen() {
           </View>
 
           {/* Interactive Date Selection Cards */}
-          <Text className="text-xs font-bold text-slate-700 mb-2">Leave Dates (Tap to pick date)</Text>
-          <View className="flex-row items-center mb-4">
+          <Text style={styles.inputSectionLabel}>Leave Dates (Tap to pick date)</Text>
+          <View style={styles.datesRow}>
             {/* From Date Card */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setActiveDatePicker('FROM')}
-              className="flex-1 bg-indigo-50 border border-indigo-200 rounded-2xl p-3"
+              style={styles.datePickerCard}
             >
-              <View className="flex-row justify-between items-center mb-1">
-                <Text className="text-[10px] font-black text-indigo-700 uppercase tracking-wider">
-                  FROM DATE
-                </Text>
-                <Calendar size={13} color="#6366f1" />
+              <View style={styles.dateCardHeader}>
+                <Text style={styles.dateCardSub}>FROM DATE</Text>
+                <Calendar size={13} color="#4f46e5" />
               </View>
-              <Text className="text-sm font-black text-slate-900">
-                {fromInfo.formatted}
-              </Text>
-              <Text className="text-[10px] font-bold text-indigo-600 mt-0.5">
-                {fromInfo.weekday}
-              </Text>
+              <Text style={styles.dateCardMain}>{fromInfo.formatted}</Text>
+              <Text style={styles.dateCardDay}>{fromInfo.weekday}</Text>
             </TouchableOpacity>
 
             {/* Duration Tag */}
-            <View className="px-2 items-center">
-              <View className="bg-indigo-100 px-2.5 py-1 rounded-full border border-indigo-200">
-                <Text className="text-[10px] font-black text-indigo-700">
+            <View style={styles.durationTagWrap}>
+              <View style={styles.durationTag}>
+                <Text style={styles.durationTagText}>
                   {totalDays} {totalDays === 1 ? 'Day' : 'Days'}
                 </Text>
               </View>
@@ -298,27 +280,21 @@ export default function EmployeeLeavesScreen() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setActiveDatePicker('TO')}
-              className="flex-1 bg-indigo-50 border border-indigo-200 rounded-2xl p-3"
+              style={styles.datePickerCard}
             >
-              <View className="flex-row justify-between items-center mb-1">
-                <Text className="text-[10px] font-black text-indigo-700 uppercase tracking-wider">
-                  TO DATE
-                </Text>
-                <Calendar size={13} color="#6366f1" />
+              <View style={styles.dateCardHeader}>
+                <Text style={styles.dateCardSub}>TO DATE</Text>
+                <Calendar size={13} color="#4f46e5" />
               </View>
-              <Text className="text-sm font-black text-slate-900">
-                {toInfo.formatted}
-              </Text>
-              <Text className="text-[10px] font-bold text-indigo-600 mt-0.5">
-                {toInfo.weekday}
-              </Text>
+              <Text style={styles.dateCardMain}>{toInfo.formatted}</Text>
+              <Text style={styles.dateCardDay}>{toInfo.weekday}</Text>
             </TouchableOpacity>
           </View>
 
           {/* Reason for Absence */}
-          <Text className="text-xs font-bold text-slate-700 mb-1.5">Reason for Absence *</Text>
+          <Text style={styles.inputSectionLabel}>Reason for Absence *</Text>
           <TextInput
-            className="bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs text-slate-900 h-20 mb-2 font-medium"
+            style={styles.reasonInput}
             value={reason}
             onChangeText={setReason}
             placeholder="Explain reason for absence (e.g. urgent family function, medical rest)"
@@ -328,7 +304,7 @@ export default function EmployeeLeavesScreen() {
           />
 
           {/* Quick Suggestions */}
-          <View className="flex-row flex-wrap mb-4">
+          <View style={styles.suggestionsRow}>
             {[
               'Family Function',
               'Medical / Unwell',
@@ -339,9 +315,9 @@ export default function EmployeeLeavesScreen() {
                 key={preset}
                 activeOpacity={0.7}
                 onPress={() => setReason(preset)}
-                className="bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg mr-1.5 mb-1.5"
+                style={styles.suggestionChip}
               >
-                <Text className="text-[10px] font-bold text-slate-600">+ {preset}</Text>
+                <Text style={styles.suggestionChipText}>+ {preset}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -349,16 +325,16 @@ export default function EmployeeLeavesScreen() {
           {/* Submit Button */}
           <TouchableOpacity
             activeOpacity={0.7}
-            className="bg-indigo-600 py-3.5 rounded-2xl items-center shadow-sm"
+            style={styles.submitBtn}
             onPress={handleApply}
             disabled={submitting}
           >
             {submitting ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
-              <View className="flex-row items-center">
+              <View style={styles.submitBtnContent}>
                 <CheckCircle2 size={16} color="#ffffff" />
-                <Text className="text-white font-black text-xs ml-1.5">
+                <Text style={styles.submitBtnText}>
                   Submit Application ({totalDays} {totalDays === 1 ? 'Day' : 'Days'})
                 </Text>
               </View>
@@ -387,14 +363,14 @@ export default function EmployeeLeavesScreen() {
       />
 
       {/* Leave Application History Header */}
-      <View className="flex-row justify-between items-center mb-3">
-        <Text className="text-base font-extrabold text-slate-900">
+      <View style={styles.historyHeaderRow}>
+        <Text style={styles.historySectionTitle}>
           Application History ({filteredLeaves.length})
         </Text>
       </View>
 
       {/* Filter Tabs */}
-      <View className="flex-row bg-slate-200 p-1 rounded-2xl mb-3">
+      <View style={styles.filterTabsWrap}>
         {[
           { key: 'ALL' as const, label: `All (${leaves.length})` },
           { key: 'PENDING' as const, label: `Pending (${pendingLeaves.length})` },
@@ -407,15 +383,9 @@ export default function EmployeeLeavesScreen() {
               key={tab.key}
               activeOpacity={0.7}
               onPress={() => setFilterTab(tab.key)}
-              className={`flex-1 py-1.5 rounded-xl items-center ${
-                active ? 'bg-white shadow-sm' : ''
-              }`}
+              style={[styles.filterTabItem, active && styles.filterTabItemActive]}
             >
-              <Text
-                className={`text-[10px] font-black ${
-                  active ? 'text-indigo-600' : 'text-slate-500'
-                }`}
-              >
+              <Text style={[styles.filterTabText, active && styles.filterTabTextActive]}>
                 {tab.label}
               </Text>
             </TouchableOpacity>
@@ -425,15 +395,15 @@ export default function EmployeeLeavesScreen() {
 
       {/* Leave History List */}
       {loading ? (
-        <View className="py-8 items-center bg-white rounded-2xl border border-slate-200">
+        <View style={styles.centerLoadingCard}>
           <ActivityIndicator size="large" color="#4f46e5" />
-          <Text className="text-xs text-slate-500 font-medium mt-3">Loading leave requests...</Text>
+          <Text style={styles.loadingText}>Loading leave requests...</Text>
         </View>
       ) : filteredLeaves.length === 0 ? (
-        <View className="items-center p-8 bg-white rounded-2xl border border-slate-200">
+        <View style={styles.emptyCard}>
           <FileText size={36} color="#cbd5e1" />
-          <Text className="text-xs font-bold text-slate-500 mt-2">No leave applications found.</Text>
-          <Text className="text-[11px] text-slate-400 mt-0.5 text-center">
+          <Text style={styles.emptyTitle}>No leave applications found.</Text>
+          <Text style={styles.emptySubtitle}>
             {filterTab === 'ALL'
               ? 'You have not submitted any leave requests yet.'
               : `No leaves in ${filterTab.toLowerCase()} status.`}
@@ -442,9 +412,9 @@ export default function EmployeeLeavesScreen() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setShowForm(true)}
-              className="mt-3 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl"
+              style={styles.emptyActionBtn}
             >
-              <Text className="text-xs font-black text-indigo-700">Apply for Leave</Text>
+              <Text style={styles.emptyActionBtnText}>Apply for Leave</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -454,87 +424,83 @@ export default function EmployeeLeavesScreen() {
           const fromDetails = formatDateDetails(leave.fromDate);
           const toDetails = formatDateDetails(leave.toDate);
 
-          const typeBadgeColor =
+          const badgeStyles =
             leave.leaveType === 'CASUAL'
-              ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+              ? { bg: '#eef2ff', border: '#c7d2fe', text: '#4338ca' }
               : leave.leaveType === 'SICK'
-              ? 'bg-purple-50 border-purple-200 text-purple-700'
-              : 'bg-amber-50 border-amber-200 text-amber-700';
+              ? { bg: '#faf5ff', border: '#e9d5ff', text: '#7e22ce' }
+              : { bg: '#fffbeb', border: '#fde68a', text: '#b45309' };
 
           return (
-            <View
-              key={leave.id}
-              className="bg-white rounded-2xl p-4 border border-slate-200 mb-3 shadow-sm"
-            >
+            <View key={leave.id} style={styles.leaveCard}>
               {/* Header row */}
-              <View className="flex-row justify-between items-center mb-2.5">
-                <View className="flex-row items-center">
-                  <View className={`px-2.5 py-1 rounded-lg border ${typeBadgeColor}`}>
-                    <Text className="text-[10px] font-black uppercase tracking-wider">
+              <View style={styles.leaveCardHeader}>
+                <View style={styles.leaveCardBadgeRow}>
+                  <View
+                    style={[
+                      styles.typePill,
+                      { backgroundColor: badgeStyles.bg, borderColor: badgeStyles.border },
+                    ]}
+                  >
+                    <Text style={[styles.typePillText, { color: badgeStyles.text }]}>
                       {leave.leaveType}
                     </Text>
                   </View>
-                  <View className="bg-slate-100 px-2 py-0.5 rounded-md ml-2">
-                    <Text className="text-[10px] font-bold text-slate-600">
+                  <View style={styles.daysPill}>
+                    <Text style={styles.daysPillText}>
                       {daysCount} {daysCount === 1 ? 'Day' : 'Days'}
                     </Text>
                   </View>
                 </View>
 
                 {leave.status === 'APPROVED' && (
-                  <View className="flex-row items-center bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                  <View style={styles.statusApproved}>
                     <CheckCircle2 size={12} color="#059669" />
-                    <Text className="text-[10px] font-black text-emerald-700 ml-1">Approved</Text>
+                    <Text style={styles.statusApprovedText}>Approved</Text>
                   </View>
                 )}
                 {leave.status === 'REJECTED' && (
-                  <View className="flex-row items-center bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
+                  <View style={styles.statusRejected}>
                     <XCircle size={12} color="#dc2626" />
-                    <Text className="text-[10px] font-black text-rose-700 ml-1">Rejected</Text>
+                    <Text style={styles.statusRejectedText}>Rejected</Text>
                   </View>
                 )}
                 {leave.status === 'PENDING' && (
-                  <View className="flex-row items-center bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                  <View style={styles.statusPending}>
                     <Clock size={12} color="#d97706" />
-                    <Text className="text-[10px] font-black text-amber-700 ml-1">Pending</Text>
+                    <Text style={styles.statusPendingText}>Pending</Text>
                   </View>
                 )}
               </View>
 
               {/* Date Range Display */}
-              <View className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-2.5 flex-row justify-between items-center">
+              <View style={styles.dateRangeBox}>
                 <View>
-                  <Text className="text-[9px] font-bold text-slate-400 uppercase">START</Text>
-                  <Text className="text-xs font-black text-slate-900 mt-0.5">
+                  <Text style={styles.dateRangeLabel}>START</Text>
+                  <Text style={styles.dateRangeVal}>
                     {fromDetails.formatted} ({fromDetails.weekday})
                   </Text>
                 </View>
-                <Text className="text-slate-400 font-bold">→</Text>
-                <View className="items-end">
-                  <Text className="text-[9px] font-bold text-slate-400 uppercase">END</Text>
-                  <Text className="text-xs font-black text-slate-900 mt-0.5">
+                <Text style={styles.dateRangeArrow}>→</Text>
+                <View style={styles.dateRangeEnd}>
+                  <Text style={styles.dateRangeLabel}>END</Text>
+                  <Text style={styles.dateRangeVal}>
                     {toDetails.formatted} ({toDetails.weekday})
                   </Text>
                 </View>
               </View>
 
               {/* Reason */}
-              <View className="mb-1">
-                <Text className="text-[10px] font-bold text-slate-400 uppercase">REASON</Text>
-                <Text className="text-xs text-slate-700 font-medium mt-0.5 italic">
-                  "{leave.reason}"
-                </Text>
+              <View style={styles.reasonWrap}>
+                <Text style={styles.reasonLabel}>REASON</Text>
+                <Text style={styles.reasonText}>"{leave.reason}"</Text>
               </View>
 
               {/* Admin note */}
               {leave.adminRemark && (
-                <View className="bg-indigo-50 p-2.5 rounded-xl mt-2.5 border-l-4 border-indigo-600">
-                  <Text className="text-[9px] font-black text-indigo-700 uppercase">
-                    Admin Decision Remark:
-                  </Text>
-                  <Text className="text-xs text-slate-800 font-semibold mt-0.5">
-                    {leave.adminRemark}
-                  </Text>
+                <View style={styles.adminRemarkBox}>
+                  <Text style={styles.adminRemarkLabel}>Admin Decision Remark:</Text>
+                  <Text style={styles.adminRemarkText}>{leave.adminRemark}</Text>
                 </View>
               )}
             </View>
@@ -544,3 +510,594 @@ export default function EmployeeLeavesScreen() {
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 48,
+  },
+  summaryBanner: {
+    backgroundColor: '#0f172a',
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  summaryHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  summaryTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  summaryTitleText: {
+    color: '#a5b4fc',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginLeft: 6,
+  },
+  monthBadge: {
+    backgroundColor: '#1e1b4b',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#4338ca',
+  },
+  monthBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#c7d2fe',
+  },
+  summaryStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+    borderRadius: 16,
+    padding: 12,
+  },
+  statCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statBorderRight: {
+    borderRightWidth: 1,
+    borderRightColor: '#334155',
+  },
+  statValWhite: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    marginTop: 2,
+  },
+  statValEmerald: {
+    color: '#34d399',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  statLabelEmerald: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#34d399',
+    textTransform: 'uppercase',
+    marginTop: 2,
+  },
+  statValAmber: {
+    color: '#fbbf24',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  statLabelAmber: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fbbf24',
+    textTransform: 'uppercase',
+    marginTop: 2,
+  },
+  statValRose: {
+    color: '#fb7185',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  statLabelRose: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fb7185',
+    textTransform: 'uppercase',
+    marginTop: 2,
+  },
+  topActionCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 16,
+  },
+  topActionTextWrap: {
+    flex: 1,
+    marginRight: 8,
+  },
+  topActionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0f172a',
+  },
+  topActionSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  toggleFormBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+  },
+  toggleFormBtnNew: {
+    backgroundColor: '#4f46e5',
+  },
+  toggleFormBtnClose: {
+    backgroundColor: '#e2e8f0',
+  },
+  toggleFormTextNew: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+    marginLeft: 6,
+  },
+  toggleFormTextClose: {
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '800',
+    marginLeft: 6,
+  },
+  formCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+    marginBottom: 18,
+  },
+  formHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  formTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  formSubtitle: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  userNameBadge: {
+    backgroundColor: '#eef2ff',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+  },
+  userNameBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#4338ca',
+  },
+  inputSectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 8,
+  },
+  leaveTypeRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 8,
+  },
+  typeCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  typeCardActive: {
+    backgroundColor: '#4f46e5',
+    borderColor: '#4f46e5',
+  },
+  typeCardInactive: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+  },
+  typeLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    marginTop: 6,
+  },
+  typeLabelActive: {
+    color: '#ffffff',
+  },
+  typeLabelInactive: {
+    color: '#1e293b',
+  },
+  typeDesc: {
+    fontSize: 9,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  typeDescActive: {
+    color: '#c7d2fe',
+  },
+  typeDescInactive: {
+    color: '#94a3b8',
+  },
+  datesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  datePickerCard: {
+    flex: 1,
+    backgroundColor: '#eef2ff',
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+    borderRadius: 16,
+    padding: 12,
+  },
+  dateCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  dateCardSub: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#4338ca',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dateCardMain: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  dateCardDay: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#4f46e5',
+    marginTop: 2,
+  },
+  durationTagWrap: {
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  durationTag: {
+    backgroundColor: '#e0e7ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+  },
+  durationTagText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#3730a3',
+  },
+  reasonInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 12,
+    color: '#0f172a',
+    height: 72,
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  suggestionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+    gap: 6,
+  },
+  suggestionChip: {
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  suggestionChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  submitBtn: {
+    backgroundColor: '#4f46e5',
+    paddingVertical: 13,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  submitBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  submitBtnText: {
+    color: '#ffffff',
+    fontWeight: '900',
+    fontSize: 12,
+    marginLeft: 6,
+  },
+  historyHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  historySectionTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  filterTabsWrap: {
+    flexDirection: 'row',
+    backgroundColor: '#e2e8f0',
+    padding: 3,
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  filterTabItem: {
+    flex: 1,
+    paddingVertical: 6,
+    borderRadius: 11,
+    alignItems: 'center',
+  },
+  filterTabItemActive: {
+    backgroundColor: '#ffffff',
+  },
+  filterTabText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748b',
+  },
+  filterTabTextActive: {
+    color: '#4f46e5',
+  },
+  centerLoadingCard: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  loadingText: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+    marginTop: 10,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    padding: 30,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  emptyTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748b',
+    marginTop: 8,
+  },
+  emptySubtitle: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  emptyActionBtn: {
+    marginTop: 12,
+    backgroundColor: '#eef2ff',
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  emptyActionBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#4338ca',
+  },
+  leaveCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 12,
+  },
+  leaveCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  leaveCardBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  typePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  typePillText: {
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  daysPill: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  daysPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  statusApproved: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ecfdf5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#a7f3d0',
+  },
+  statusApprovedText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#047857',
+    marginLeft: 4,
+  },
+  statusRejected: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff1f2',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#fecdd3',
+  },
+  statusRejectedText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#be123c',
+    marginLeft: 4,
+  },
+  statusPending: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fffbeb',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  statusPendingText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#b45309',
+    marginLeft: 4,
+  },
+  dateRangeBox: {
+    backgroundColor: '#f8fafc',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dateRangeLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+  },
+  dateRangeVal: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#0f172a',
+    marginTop: 2,
+  },
+  dateRangeArrow: {
+    color: '#94a3b8',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  dateRangeEnd: {
+    alignItems: 'flex-end',
+  },
+  reasonWrap: {
+    marginBottom: 4,
+  },
+  reasonLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+  },
+  reasonText: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '500',
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  adminRemarkBox: {
+    backgroundColor: '#eef2ff',
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4f46e5',
+  },
+  adminRemarkLabel: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#4338ca',
+    textTransform: 'uppercase',
+  },
+  adminRemarkText: {
+    fontSize: 12,
+    color: '#1e293b',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+});

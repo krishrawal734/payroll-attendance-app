@@ -5,6 +5,8 @@ import {
   Modal,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  StyleSheet,
+  Dimensions,
 } from 'react-native';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Check, X } from 'lucide-react-native';
 
@@ -135,7 +137,7 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
       });
     }
 
-    // Next month filler days to complete rows (up to multiple of 7)
+    // Next month filler days to complete rows (multiple of 7)
     const remaining = (7 - (cells.length % 7)) % 7;
     for (let d = 1; d <= remaining; d++) {
       const nextM = viewMonth === 11 ? 0 : viewMonth + 1;
@@ -164,7 +166,7 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
     onClose();
   };
 
-  // Formatted date string for header preview: e.g. "Wed, 25 Nov 2026"
+  // Formatted date string for preview: e.g. "Wed, 25 Nov 2026"
   const formattedPickedDate = useMemo(() => {
     if (!pickedDate) return '';
     try {
@@ -185,71 +187,68 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View
-          style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.65)', justifyContent: 'center', alignItems: 'center', padding: 16 }}
-        >
+        <View style={styles.backdrop}>
           <TouchableWithoutFeedback>
-            <View className="bg-white rounded-3xl w-full max-w-sm overflow-hidden border border-slate-200">
+            <View style={styles.modalCard}>
               {/* Header */}
-              <View className="bg-indigo-600 px-5 pt-5 pb-4">
-                <View className="flex-row justify-between items-center mb-1.5">
-                  <View className="flex-row items-center">
-                    <CalendarIcon size={16} color="#c7d2fe" />
-                    <Text className="text-indigo-200 text-xs font-bold uppercase tracking-wider ml-1.5">
-                      {title}
-                    </Text>
+              <View style={styles.header}>
+                <View style={styles.headerTopRow}>
+                  <View style={styles.headerTitleWrap}>
+                    <CalendarIcon size={15} color="#c7d2fe" />
+                    <Text style={styles.headerTitleText}>{title}</Text>
                   </View>
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={onClose}
-                    className="w-7 h-7 rounded-full bg-indigo-800 items-center justify-center"
+                    style={styles.closeBtn}
                   >
                     <X size={15} color="#ffffff" />
                   </TouchableOpacity>
                 </View>
-                <Text className="text-white text-xl font-black">{formattedPickedDate || pickedDate}</Text>
+                <Text style={styles.headerDateText}>{formattedPickedDate || pickedDate}</Text>
               </View>
 
               {/* Month Navigator */}
-              <View className="flex-row justify-between items-center px-4 py-3 border-b border-slate-100">
+              <View style={styles.navRow}>
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handlePrevMonth}
-                  className="w-9 h-9 rounded-xl bg-slate-100 items-center justify-center"
+                  style={styles.navBtn}
                 >
                   <ChevronLeft size={18} color="#334155" />
                 </TouchableOpacity>
 
-                <View className="flex-row items-center">
-                  <Text className="text-sm font-black text-slate-900 mr-2">
+                <View style={styles.monthTitleWrap}>
+                  <Text style={styles.monthTitleText}>
                     {MONTH_NAMES[viewMonth]} {viewYear}
                   </Text>
                   <TouchableOpacity
                     activeOpacity={0.7}
                     onPress={handleJumpToday}
-                    className="bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full"
+                    style={styles.todayPill}
                   >
-                    <Text className="text-[10px] font-black text-indigo-700">Today</Text>
+                    <Text style={styles.todayPillText}>Today</Text>
                   </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handleNextMonth}
-                  className="w-9 h-9 rounded-xl bg-slate-100 items-center justify-center"
+                  style={styles.navBtn}
                 >
                   <ChevronRight size={18} color="#334155" />
                 </TouchableOpacity>
               </View>
 
               {/* Week Day Header */}
-              <View className="flex-row px-3 pt-2 pb-1 border-b border-slate-100 bg-slate-50">
+              <View style={styles.weekDaysRow}>
                 {WEEK_DAYS.map((wd, i) => (
-                  <View key={wd} className="flex-1 items-center">
+                  <View key={wd} style={styles.weekDayCell}>
                     <Text
-                      className={`text-[11px] font-extrabold ${
-                        i === 0 || i === 6 ? 'text-rose-400' : 'text-slate-500'
-                      }`}
+                      style={[
+                        styles.weekDayText,
+                        (i === 0 || i === 6) && styles.weekEndText,
+                      ]}
                     >
                       {wd}
                     </Text>
@@ -258,8 +257,8 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
               </View>
 
               {/* Day Grid */}
-              <View className="p-3">
-                <View className="flex-row flex-wrap">
+              <View style={styles.gridContainer}>
+                <View style={styles.gridWrap}>
                   {calendarGrid.map((item, idx) => {
                     const isSelected = item.isSelected;
                     const isToday = item.isToday;
@@ -267,39 +266,31 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                     const isCurrent = item.isCurrentMonth;
 
                     return (
-                      <View key={`${item.dateStr}_${idx}`} className="w-[14.28%] aspect-square p-0.5">
+                      <View key={`${item.dateStr}_${idx}`} style={styles.cellOuter}>
                         <TouchableOpacity
                           activeOpacity={0.7}
                           disabled={isDisabled}
                           onPress={() => handleSelectDay(item.dateStr, isDisabled)}
-                          className={`w-full h-full rounded-2xl items-center justify-center relative ${
-                            isSelected
-                              ? 'bg-indigo-600'
-                              : isToday
-                              ? 'bg-indigo-50 border border-indigo-300'
-                              : 'bg-white'
-                          }`}
+                          style={[
+                            styles.cellInner,
+                            isSelected && styles.cellSelected,
+                            isToday && !isSelected && styles.cellToday,
+                          ]}
                         >
                           <Text
-                            className={`text-xs ${
-                              isSelected
-                                ? 'text-white font-black'
-                                : isDisabled
-                                ? 'text-slate-300 font-normal line-through'
-                                : !isCurrent
-                                ? 'text-slate-300 font-medium'
-                                : isToday
-                                ? 'text-indigo-700 font-extrabold'
-                                : 'text-slate-800 font-bold'
-                            }`}
+                            style={[
+                              styles.dayNumberText,
+                              isSelected && styles.dayNumberSelected,
+                              isDisabled && styles.dayNumberDisabled,
+                              !isCurrent && !isDisabled && styles.dayNumberNotCurrent,
+                              isToday && !isSelected && styles.dayNumberToday,
+                            ]}
                           >
                             {item.dayNum}
                           </Text>
 
                           {/* Today Dot indicator if not selected */}
-                          {isToday && !isSelected && (
-                            <View className="w-1 h-1 rounded-full bg-indigo-600 absolute bottom-1" />
-                          )}
+                          {isToday && !isSelected && <View style={styles.todayDot} />}
                         </TouchableOpacity>
                       </View>
                     );
@@ -308,7 +299,7 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
               </View>
 
               {/* Quick Presets */}
-              <View className="flex-row px-4 pb-3 justify-between space-x-1.5">
+              <View style={styles.presetsRow}>
                 {[
                   { label: 'Today', days: 0 },
                   { label: 'Tomorrow', days: 1 },
@@ -329,17 +320,12 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                         setViewYear(targetD.getFullYear());
                         setViewMonth(targetD.getMonth());
                       }}
-                      className={`flex-1 py-1.5 rounded-xl border items-center mr-1 last:mr-0 ${
-                        active
-                          ? 'bg-indigo-600 border-indigo-600'
-                          : 'bg-slate-50 border-slate-200'
-                      }`}
+                      style={[
+                        styles.presetBtn,
+                        active && styles.presetBtnActive,
+                      ]}
                     >
-                      <Text
-                        className={`text-[10px] font-bold ${
-                          active ? 'text-white' : 'text-slate-600'
-                        }`}
-                      >
+                      <Text style={[styles.presetBtnText, active && styles.presetBtnTextActive]}>
                         {preset.label}
                       </Text>
                     </TouchableOpacity>
@@ -348,22 +334,22 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
               </View>
 
               {/* Action Buttons */}
-              <View className="flex-row p-3 bg-slate-50 border-t border-slate-100">
+              <View style={styles.actionRow}>
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={onClose}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-300 mr-2 items-center bg-white"
+                  style={styles.cancelBtn}
                 >
-                  <Text className="text-xs font-bold text-slate-700">Cancel</Text>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handleConfirm}
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 items-center justify-center flex-row"
+                  style={styles.confirmBtn}
                 >
-                  <Check size={14} color="#ffffff" />
-                  <Text className="text-xs font-black text-white ml-1.5">Select Date</Text>
+                  <Check size={15} color="#ffffff" />
+                  <Text style={styles.confirmBtnText}>Select Date</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -373,3 +359,242 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
     </Modal>
   );
 };
+
+const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 360,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  header: {
+    backgroundColor: '#4f46e5',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 16,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  headerTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitleText: {
+    color: '#c7d2fe',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginLeft: 6,
+  },
+  closeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#3730a3',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerDateText: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  navRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  navBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  monthTitleText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0f172a',
+    marginRight: 8,
+  },
+  todayPill: {
+    backgroundColor: '#eef2ff',
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  todayPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#4f46e5',
+  },
+  weekDaysRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    backgroundColor: '#f8fafc',
+  },
+  weekDayCell: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  weekDayText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  weekEndText: {
+    color: '#f43f5e',
+  },
+  gridContainer: {
+    padding: 12,
+  },
+  gridWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  cellOuter: {
+    width: '14.28%',
+    aspectRatio: 1,
+    padding: 2,
+  },
+  cellInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  cellSelected: {
+    backgroundColor: '#4f46e5',
+  },
+  cellToday: {
+    backgroundColor: '#eef2ff',
+    borderWidth: 1,
+    borderColor: '#a5b4fc',
+  },
+  dayNumberText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  dayNumberSelected: {
+    color: '#ffffff',
+    fontWeight: '900',
+  },
+  dayNumberDisabled: {
+    color: '#cbd5e1',
+    fontWeight: '400',
+    textDecorationLine: 'line-through',
+  },
+  dayNumberNotCurrent: {
+    color: '#cbd5e1',
+    fontWeight: '500',
+  },
+  dayNumberToday: {
+    color: '#4338ca',
+    fontWeight: '800',
+  },
+  todayDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#4f46e5',
+    position: 'absolute',
+    bottom: 3,
+  },
+  presetsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    gap: 6,
+  },
+  presetBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+  },
+  presetBtnActive: {
+    backgroundColor: '#4f46e5',
+    borderColor: '#4f46e5',
+  },
+  presetBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  presetBtnTextActive: {
+    color: '#ffffff',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    gap: 8,
+  },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+  },
+  cancelBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  confirmBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#4f46e5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  confirmBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginLeft: 6,
+  },
+});
