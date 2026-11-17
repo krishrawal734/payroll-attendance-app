@@ -5,7 +5,6 @@ import {
   Modal,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  ScrollView,
 } from 'react-native';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Check, X } from 'lucide-react-native';
 
@@ -186,9 +185,11 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View className="flex-1 bg-black/60 justify-center items-center p-4">
+        <View
+          style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.65)', justifyContent: 'center', alignItems: 'center', padding: 16 }}
+        >
           <TouchableWithoutFeedback>
-            <View className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-100">
+            <View className="bg-white rounded-3xl w-full max-w-sm overflow-hidden border border-slate-200">
               {/* Header */}
               <View className="bg-indigo-600 px-5 pt-5 pb-4">
                 <View className="flex-row justify-between items-center mb-1.5">
@@ -199,8 +200,9 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                     </Text>
                   </View>
                   <TouchableOpacity
+                    activeOpacity={0.7}
                     onPress={onClose}
-                    className="w-7 h-7 rounded-full bg-indigo-700/60 items-center justify-center"
+                    className="w-7 h-7 rounded-full bg-indigo-800 items-center justify-center"
                   >
                     <X size={15} color="#ffffff" />
                   </TouchableOpacity>
@@ -211,8 +213,9 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
               {/* Month Navigator */}
               <View className="flex-row justify-between items-center px-4 py-3 border-b border-slate-100">
                 <TouchableOpacity
+                  activeOpacity={0.7}
                   onPress={handlePrevMonth}
-                  className="w-9 h-9 rounded-xl bg-slate-100 items-center justify-center active:bg-slate-200"
+                  className="w-9 h-9 rounded-xl bg-slate-100 items-center justify-center"
                 >
                   <ChevronLeft size={18} color="#334155" />
                 </TouchableOpacity>
@@ -222,6 +225,7 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                     {MONTH_NAMES[viewMonth]} {viewYear}
                   </Text>
                   <TouchableOpacity
+                    activeOpacity={0.7}
                     onPress={handleJumpToday}
                     className="bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full"
                   >
@@ -230,8 +234,9 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                 </View>
 
                 <TouchableOpacity
+                  activeOpacity={0.7}
                   onPress={handleNextMonth}
-                  className="w-9 h-9 rounded-xl bg-slate-100 items-center justify-center active:bg-slate-200"
+                  className="w-9 h-9 rounded-xl bg-slate-100 items-center justify-center"
                 >
                   <ChevronRight size={18} color="#334155" />
                 </TouchableOpacity>
@@ -264,14 +269,15 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                     return (
                       <View key={`${item.dateStr}_${idx}`} className="w-[14.28%] aspect-square p-0.5">
                         <TouchableOpacity
+                          activeOpacity={0.7}
                           disabled={isDisabled}
                           onPress={() => handleSelectDay(item.dateStr, isDisabled)}
                           className={`w-full h-full rounded-2xl items-center justify-center relative ${
                             isSelected
-                              ? 'bg-indigo-600 shadow-sm'
+                              ? 'bg-indigo-600'
                               : isToday
                               ? 'bg-indigo-50 border border-indigo-300'
-                              : 'active:bg-slate-100'
+                              : 'bg-white'
                           }`}
                         >
                           <Text
@@ -317,12 +323,13 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                   return (
                     <TouchableOpacity
                       key={preset.label}
+                      activeOpacity={0.7}
                       onPress={() => {
                         setPickedDate(targetStr);
                         setViewYear(targetD.getFullYear());
                         setViewMonth(targetD.getMonth());
                       }}
-                      className={`flex-1 py-1.5 rounded-xl border items-center ${
+                      className={`flex-1 py-1.5 rounded-xl border items-center mr-1 last:mr-0 ${
                         active
                           ? 'bg-indigo-600 border-indigo-600'
                           : 'bg-slate-50 border-slate-200'
@@ -343,15 +350,17 @@ export const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
               {/* Action Buttons */}
               <View className="flex-row p-3 bg-slate-50 border-t border-slate-100">
                 <TouchableOpacity
+                  activeOpacity={0.7}
                   onPress={onClose}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-300 mr-2 items-center active:bg-slate-200"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 mr-2 items-center bg-white"
                 >
                   <Text className="text-xs font-bold text-slate-700">Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  activeOpacity={0.7}
                   onPress={handleConfirm}
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 items-center justify-center flex-row shadow-xs active:bg-indigo-700"
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 items-center justify-center flex-row"
                 >
                   <Check size={14} color="#ffffff" />
                   <Text className="text-xs font-black text-white ml-1.5">Select Date</Text>

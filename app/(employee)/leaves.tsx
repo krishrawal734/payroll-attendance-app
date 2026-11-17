@@ -24,7 +24,6 @@ import {
   Stethoscope,
   PauseCircle,
   X,
-  ChevronDown,
 } from 'lucide-react-native';
 
 export default function EmployeeLeavesScreen() {
@@ -37,11 +36,6 @@ export default function EmployeeLeavesScreen() {
 
   // Dynamic default dates (Today and Tomorrow)
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
-  const tomorrowStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
-  }, []);
 
   const [leaveType, setLeaveType] = useState<LeaveType>('CASUAL');
   const [fromDate, setFromDate] = useState<string>(todayStr);
@@ -159,23 +153,23 @@ export default function EmployeeLeavesScreen() {
               My Leaves Overview
             </Text>
           </View>
-          <View className="bg-indigo-900/60 px-2.5 py-0.5 rounded-full border border-indigo-700">
+          <View className="bg-indigo-950 px-2.5 py-0.5 rounded-full border border-indigo-700">
             <Text className="text-[10px] font-bold text-indigo-300">
               {new Date().toLocaleString('en-IN', { month: 'short', year: 'numeric' })}
             </Text>
           </View>
         </View>
 
-        <View className="flex-row justify-between items-center bg-slate-800/60 rounded-2xl p-3 border border-slate-700/60">
-          <View className="items-center flex-1 border-r border-slate-700/60">
+        <View className="flex-row justify-between items-center bg-slate-800 rounded-2xl p-3 border border-slate-700">
+          <View className="items-center flex-1 border-r border-slate-700">
             <Text className="text-white text-xl font-black">{leaves.length}</Text>
             <Text className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">Applied</Text>
           </View>
-          <View className="items-center flex-1 border-r border-slate-700/60">
+          <View className="items-center flex-1 border-r border-slate-700">
             <Text className="text-emerald-400 text-xl font-black">{approvedLeaves.length}</Text>
             <Text className="text-[10px] font-bold text-emerald-400 uppercase mt-0.5">Approved</Text>
           </View>
-          <View className="items-center flex-1 border-r border-slate-700/60">
+          <View className="items-center flex-1 border-r border-slate-700">
             <Text className="text-amber-400 text-xl font-black">{pendingLeaves.length}</Text>
             <Text className="text-[10px] font-bold text-amber-400 uppercase mt-0.5">Pending</Text>
           </View>
@@ -187,14 +181,15 @@ export default function EmployeeLeavesScreen() {
       </View>
 
       {/* Top Action Card */}
-      <View className="flex-row justify-between items-center bg-white rounded-2xl p-4 border border-slate-200 mb-4 shadow-xs">
+      <View className="flex-row justify-between items-center bg-white rounded-2xl p-4 border border-slate-200 mb-4 shadow-sm">
         <View className="flex-1 mr-2">
           <Text className="text-base font-extrabold text-slate-900">Apply for Time-Off</Text>
           <Text className="text-xs text-slate-500 mt-0.5">Submit request for admin approval</Text>
         </View>
         <TouchableOpacity
-          className={`flex-row items-center px-4 py-2.5 rounded-xl shadow-xs ${
-            showForm ? 'bg-slate-200' : 'bg-indigo-600 active:bg-indigo-700'
+          activeOpacity={0.7}
+          className={`flex-row items-center px-4 py-2.5 rounded-xl ${
+            showForm ? 'bg-slate-200' : 'bg-indigo-600'
           }`}
           onPress={() => setShowForm(!showForm)}
         >
@@ -227,7 +222,7 @@ export default function EmployeeLeavesScreen() {
 
           {/* Leave Type Selector */}
           <Text className="text-xs font-bold text-slate-700 mb-2">Select Leave Type</Text>
-          <View className="flex-row mb-4 space-x-2">
+          <View className="flex-row mb-4">
             {[
               { type: 'CASUAL' as LeaveType, label: 'Casual', icon: Coffee, desc: 'Personal' },
               { type: 'SICK' as LeaveType, label: 'Sick', icon: Stethoscope, desc: 'Medical' },
@@ -239,11 +234,12 @@ export default function EmployeeLeavesScreen() {
               return (
                 <TouchableOpacity
                   key={item.type}
+                  activeOpacity={0.7}
                   onPress={() => setLeaveType(item.type)}
                   className={`flex-1 p-3 rounded-2xl border items-center mr-2 last:mr-0 ${
                     active
                       ? 'bg-indigo-600 border-indigo-600 shadow-sm'
-                      : 'bg-slate-50 border-slate-200 active:bg-slate-100'
+                      : 'bg-slate-50 border-slate-200'
                   }`}
                 >
                   <IconComp size={18} color={active ? '#ffffff' : '#64748b'} />
@@ -271,11 +267,12 @@ export default function EmployeeLeavesScreen() {
           <View className="flex-row items-center mb-4">
             {/* From Date Card */}
             <TouchableOpacity
+              activeOpacity={0.7}
               onPress={() => setActiveDatePicker('FROM')}
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl p-3 shadow-2xs active:border-indigo-500 active:bg-indigo-50/20"
+              className="flex-1 bg-indigo-50 border border-indigo-200 rounded-2xl p-3"
             >
               <View className="flex-row justify-between items-center mb-1">
-                <Text className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                <Text className="text-[10px] font-black text-indigo-700 uppercase tracking-wider">
                   FROM DATE
                 </Text>
                 <Calendar size={13} color="#6366f1" />
@@ -290,7 +287,7 @@ export default function EmployeeLeavesScreen() {
 
             {/* Duration Tag */}
             <View className="px-2 items-center">
-              <View className="bg-indigo-100/80 px-2 py-1 rounded-full border border-indigo-200">
+              <View className="bg-indigo-100 px-2.5 py-1 rounded-full border border-indigo-200">
                 <Text className="text-[10px] font-black text-indigo-700">
                   {totalDays} {totalDays === 1 ? 'Day' : 'Days'}
                 </Text>
@@ -299,11 +296,12 @@ export default function EmployeeLeavesScreen() {
 
             {/* To Date Card */}
             <TouchableOpacity
+              activeOpacity={0.7}
               onPress={() => setActiveDatePicker('TO')}
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl p-3 shadow-2xs active:border-indigo-500 active:bg-indigo-50/20"
+              className="flex-1 bg-indigo-50 border border-indigo-200 rounded-2xl p-3"
             >
               <View className="flex-row justify-between items-center mb-1">
-                <Text className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                <Text className="text-[10px] font-black text-indigo-700 uppercase tracking-wider">
                   TO DATE
                 </Text>
                 <Calendar size={13} color="#6366f1" />
@@ -320,7 +318,7 @@ export default function EmployeeLeavesScreen() {
           {/* Reason for Absence */}
           <Text className="text-xs font-bold text-slate-700 mb-1.5">Reason for Absence *</Text>
           <TextInput
-            className="bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs text-slate-900 h-20 mb-2 focus:border-indigo-500 focus:bg-white font-medium"
+            className="bg-slate-50 border border-slate-200 rounded-2xl px-3.5 py-2.5 text-xs text-slate-900 h-20 mb-2 font-medium"
             value={reason}
             onChangeText={setReason}
             placeholder="Explain reason for absence (e.g. urgent family function, medical rest)"
@@ -339,6 +337,7 @@ export default function EmployeeLeavesScreen() {
             ].map((preset) => (
               <TouchableOpacity
                 key={preset}
+                activeOpacity={0.7}
                 onPress={() => setReason(preset)}
                 className="bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg mr-1.5 mb-1.5"
               >
@@ -349,7 +348,8 @@ export default function EmployeeLeavesScreen() {
 
           {/* Submit Button */}
           <TouchableOpacity
-            className="bg-indigo-600 py-3.5 rounded-2xl items-center shadow-xs active:bg-indigo-700"
+            activeOpacity={0.7}
+            className="bg-indigo-600 py-3.5 rounded-2xl items-center shadow-sm"
             onPress={handleApply}
             disabled={submitting}
           >
@@ -394,7 +394,7 @@ export default function EmployeeLeavesScreen() {
       </View>
 
       {/* Filter Tabs */}
-      <View className="flex-row bg-slate-200/80 p-1 rounded-2xl mb-3">
+      <View className="flex-row bg-slate-200 p-1 rounded-2xl mb-3">
         {[
           { key: 'ALL' as const, label: `All (${leaves.length})` },
           { key: 'PENDING' as const, label: `Pending (${pendingLeaves.length})` },
@@ -405,9 +405,10 @@ export default function EmployeeLeavesScreen() {
           return (
             <TouchableOpacity
               key={tab.key}
+              activeOpacity={0.7}
               onPress={() => setFilterTab(tab.key)}
               className={`flex-1 py-1.5 rounded-xl items-center ${
-                active ? 'bg-white shadow-xs' : ''
+                active ? 'bg-white shadow-sm' : ''
               }`}
             >
               <Text
@@ -439,6 +440,7 @@ export default function EmployeeLeavesScreen() {
           </Text>
           {filterTab === 'ALL' && !showForm && (
             <TouchableOpacity
+              activeOpacity={0.7}
               onPress={() => setShowForm(true)}
               className="mt-3 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl"
             >
@@ -462,7 +464,7 @@ export default function EmployeeLeavesScreen() {
           return (
             <View
               key={leave.id}
-              className="bg-white rounded-2xl p-4 border border-slate-200 mb-3 shadow-xs"
+              className="bg-white rounded-2xl p-4 border border-slate-200 mb-3 shadow-sm"
             >
               {/* Header row */}
               <View className="flex-row justify-between items-center mb-2.5">
@@ -526,7 +528,7 @@ export default function EmployeeLeavesScreen() {
 
               {/* Admin note */}
               {leave.adminRemark && (
-                <View className="bg-indigo-50/70 p-2.5 rounded-xl mt-2.5 border-l-4 border-indigo-600">
+                <View className="bg-indigo-50 p-2.5 rounded-xl mt-2.5 border-l-4 border-indigo-600">
                   <Text className="text-[9px] font-black text-indigo-700 uppercase">
                     Admin Decision Remark:
                   </Text>
