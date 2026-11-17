@@ -904,8 +904,8 @@ export function generatePayrollRegisterHtml(
       const nightBonus = nightShifts * 250;
       const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
       const activeAdv = fin?.activeAdvanceBalance || 0;
-      const advanceDeduction = payslip?.advanceDeductions ?? Math.min(activeAdv, 3000);
-      const net = payslip?.netPayable ?? (fin?.pendingPayable || 0);
+      const advanceDeduction = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
+      const net = payslip?.netPayable ?? Math.max(0, gross - advanceDeduction);
       const status = payslip?.paymentStatus || (net <= 0 ? 'PAID' : 'PENDING DISBURSAL');
 
       totalGross += gross;

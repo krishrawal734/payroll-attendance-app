@@ -114,11 +114,11 @@ export class DataService {
     return { success: res.success, message: res.message };
   }
 
-  async getEmployeeFinancialSummary(employeeId: string) {
+  async getEmployeeFinancialSummary(employeeId: string, monthYear?: string) {
     if (this.isCloud()) {
-      return await supabaseService.getEmployeeFinancialSummary(employeeId);
+      return await supabaseService.getEmployeeFinancialSummary(employeeId, monthYear);
     }
-    return db.getEmployeeFinancialSummary(employeeId);
+    return db.getEmployeeFinancialSummary(employeeId, monthYear);
   }
 
   // --- Payslips ---

@@ -7,6 +7,7 @@ import {
   SalaryTransaction,
   Payslip,
   AttendanceLocation,
+  EmployeeFinancialSummary,
 } from '../types';
 
 export class SupabaseService {
@@ -420,9 +421,13 @@ export class SupabaseService {
   }
 
   // --- Financial Summary ---
-  async getEmployeeFinancialSummary(employeeId: string) {
+  async getEmployeeFinancialSummary(employeeId: string, monthYear?: string): Promise<EmployeeFinancialSummary | null> {
     const emp = await this.getEmployeeById(employeeId);
     if (!emp) return null;
+
+    if (!this.isUUID(employeeId)) {
+      return db.getEmployeeFinancialSummary(employeeId, monthYear);
+    }
 
     const txs = await this.getTransactions(employeeId);
 
@@ -440,20 +445,23 @@ export class SupabaseService {
       .filter((t) => t.type === 'SALARY_PAYMENT')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const monthPrefix = new Date().toISOString().slice(0, 7);
-    const attendance = (await this.getAttendance(employeeId)).filter((a) => a.date.startsWith(monthPrefix));
+    const targetMonth = monthYear || new Date().toISOString().slice(0, 7);
+    const attendance = (await this.getAttendance(employeeId)).filter((a) => a.date.startsWith(targetMonth));
     const presentDays = attendance.filter((a) => a.status === 'PRESENT').length;
     const nightPresentDays = attendance.filter((a) => a.isNightPresent).length;
+    const leaves = (await this.getLeaves(employeeId)).filter(
+      (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(targetMonth) || l.toDate.startsWith(targetMonth))
+    );
 
-    let estimatedCurrentEarnings = 0;
-    if (emp.salaryType === 'monthly') {
-      const dailyRate = emp.baseSalary / 30;
-      estimatedCurrentEarnings = Math.round(dailyRate * presentDays + nightPresentDays * 200);
-    } else {
-      estimatedCurrentEarnings = Math.round(emp.baseSalary * presentDays + nightPresentDays * 200);
-    }
+    const nightAllowance = nightPresentDays * 250;
+    const payableDays = Math.min(presentDays + leaves.length, 30);
+    const baseEarnings = emp.salaryType === 'monthly'
+      ? Math.round((emp.baseSalary / 30) * payableDays)
+      : Math.round(emp.baseSalary * presentDays);
 
-    const pendingPayable = Math.max(0, estimatedCurrentEarnings - activeAdvanceBalance);
+    const estimatedCurrentEarnings = baseEarnings + nightAllowance;
+    const advanceDeduction = Math.min(activeAdvanceBalance, estimatedCurrentEarnings);
+    const pendingPayable = Math.max(0, estimatedCurrentEarnings - advanceDeduction);
 
     return {
       baseSalary: emp.baseSalary,
@@ -463,7 +471,10 @@ export class SupabaseService {
       totalSalaryPaid,
       presentDays,
       nightPresentDays,
+      nightAllowance,
+      baseEarnings,
       estimatedCurrentEarnings,
+      advanceDeduction,
       pendingPayable,
     };
   }
@@ -535,16 +546,22 @@ export class SupabaseService {
     }
 
     const attendance = (await this.getAttendance(employeeId)).filter((a) => a.date.startsWith(monthYear));
-    const presentDays = Math.max(attendance.filter((a) => a.status === 'PRESENT').length, 24);
-    const nightPresentDays = attendance.filter((a) => a.isNightPresent).length || 5;
-    const leaves = (await this.getLeaves(employeeId)).filter((l) => l.status === 'APPROVED');
+    const presentDays = attendance.filter((a) => a.status === 'PRESENT').length;
+    const nightPresentDays = attendance.filter((a) => a.isNightPresent).length;
+    const leaves = (await this.getLeaves(employeeId)).filter(
+      (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(monthYear) || l.toDate.startsWith(monthYear))
+    );
 
     const nightAllowance = nightPresentDays * 250;
-    const gross = emp.salaryType === 'monthly' ? emp.baseSalary + nightAllowance : emp.baseSalary * presentDays + nightAllowance;
+    const payableDays = Math.min(presentDays + leaves.length, 30);
+    const baseEarnings = emp.salaryType === 'monthly'
+      ? Math.round((emp.baseSalary / 30) * payableDays)
+      : Math.round(emp.baseSalary * presentDays);
+    const gross = baseEarnings + nightAllowance;
 
-    const finSummary = await this.getEmployeeFinancialSummary(employeeId);
-    const advanceDeduction = Math.min(finSummary?.activeAdvanceBalance || 0, 3000);
-    const net = gross - advanceDeduction;
+    const finSummary = await this.getEmployeeFinancialSummary(employeeId, monthYear);
+    const advanceDeduction = Math.min(finSummary?.activeAdvanceBalance || 0, gross);
+    const net = Math.max(0, gross - advanceDeduction);
 
     const { data, error } = await supabase
       .from('payslips')

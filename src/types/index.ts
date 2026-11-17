@@ -83,3 +83,18 @@ export interface Payslip {
   paymentStatus: 'PAID' | 'UNPAID' | 'PARTIAL';
   generatedAt: string;
 }
+
+export interface EmployeeFinancialSummary {
+  baseSalary: number;
+  salaryType: SalaryType;
+  activeAdvanceBalance: number;
+  totalAdvancesTaken: number;
+  totalSalaryPaid: number;
+  presentDays: number;
+  nightPresentDays: number;
+  nightAllowance: number;
+  baseEarnings: number;
+  estimatedCurrentEarnings: number;
+  advanceDeduction: number;
+  pendingPayable: number;
+}

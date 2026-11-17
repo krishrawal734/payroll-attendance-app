@@ -158,7 +158,8 @@ export class ExportService {
   async exportPayrollReport(
     employees: Employee[],
     summaries: Record<string, any>,
-    monthYear: string
+    monthYear: string,
+    payslips: Payslip[] = []
   ): Promise<{ success: boolean; uri?: string; error?: string }> {
     try {
       const staff = employees.filter((e) => e.role === 'employee');
@@ -176,23 +177,28 @@ export class ExportService {
         'Base Salary / Rate (INR)',
         'Present Days',
         'Night Shifts (>7 PM)',
+        'Base Shift Earnings (INR)',
         'Night Allowance (INR)',
         'Gross Earnings (INR)',
         'Advance Deductions (INR)',
         'Active Advance Due (INR)',
         'Net Take-Home Payable (INR)',
+        'Disbursal Status',
         'UPI ID for Transfer',
       ];
 
       const rows = staff.map((emp) => {
         const fin = summaries[emp.id];
-        const presentDays = fin?.presentDays || 0;
-        const nightShifts = fin?.nightPresentDays || 0;
+        const payslip = payslips.find((p) => p.employeeId === emp.id && p.monthYear === monthYear);
+        const presentDays = payslip?.presentDays ?? (fin?.presentDays || 0);
+        const nightShifts = payslip?.nightPresentDays ?? (fin?.nightPresentDays || 0);
         const nightBonus = nightShifts * 250;
-        const gross = fin?.estimatedCurrentEarnings || 0;
+        const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
+        const baseShiftEarnings = gross - nightBonus;
         const activeAdv = fin?.activeAdvanceBalance || 0;
-        const advanceDeduction = Math.min(activeAdv, 3000);
-        const net = fin?.pendingPayable || 0;
+        const advanceDeduction = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
+        const net = payslip?.netPayable ?? Math.max(0, gross - advanceDeduction);
+        const status = payslip?.paymentStatus || (net <= 0 ? 'PAID' : 'PENDING DISBURSAL');
 
         return [
           this.escapeCsv(emp.fullName),
@@ -202,11 +208,13 @@ export class ExportService {
           this.escapeCsv(emp.baseSalary),
           this.escapeCsv(presentDays),
           this.escapeCsv(nightShifts),
+          this.escapeCsv(baseShiftEarnings),
           this.escapeCsv(nightBonus),
           this.escapeCsv(gross),
           this.escapeCsv(advanceDeduction),
           this.escapeCsv(activeAdv),
           this.escapeCsv(net),
+          this.escapeCsv(status),
           this.escapeCsv(emp.bankUpiId || 'Not Set'),
         ].join(',');
       });
@@ -332,7 +340,7 @@ export class ExportService {
       payslips,
       async () => {
         onStartLoading?.();
-        await this.exportPayrollReport(employees, summaries, monthYear);
+        await this.exportPayrollReport(employees, summaries, monthYear, payslips);
         onEndLoading?.();
       },
       onStartLoading,

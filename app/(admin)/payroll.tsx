@@ -61,8 +61,9 @@ export default function AdminPayrollScreen() {
   const [payRef, setPayRef] = useState('');
   const [submittingPay, setSubmittingPay] = useState(false);
 
-  const loadData = async () => {
+  const loadData = async (month: string = selectedMonth) => {
     try {
+      setLoading(true);
       const [allEmps, slips] = await Promise.all([
         dataService.getEmployees(),
         dataService.getPayslips(),
@@ -72,11 +73,11 @@ export default function AdminPayrollScreen() {
       setEmployees(staff);
       setAllPayslips(slips);
 
-      // Load financial summaries
+      // Load financial summaries for the selected month
       const sumMap: Record<string, any> = {};
       await Promise.all(
         staff.map(async (emp) => {
-          const fin = await dataService.getEmployeeFinancialSummary(emp.id);
+          const fin = await dataService.getEmployeeFinancialSummary(emp.id, month);
           sumMap[emp.id] = fin;
         })
       );
@@ -90,13 +91,13 @@ export default function AdminPayrollScreen() {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(selectedMonth);
+  }, [selectedMonth]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadData();
-  }, []);
+    loadData(selectedMonth);
+  }, [selectedMonth]);
 
   const staff = employees.filter((e) => e.role === 'employee');
 
@@ -112,11 +113,12 @@ export default function AdminPayrollScreen() {
     const payslip = allPayslips.find(
       (p) => p.employeeId === emp.id && p.monthYear === selectedMonth
     );
-    const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
-    const night = (payslip?.nightPresentDays ?? (fin?.nightPresentDays || 0)) * 250;
+    const gross = payslip ? payslip.grossEarnings : (fin?.estimatedCurrentEarnings || 0);
+    const nightShifts = payslip ? payslip.nightPresentDays : (fin?.nightPresentDays || 0);
+    const night = nightShifts * 250;
     const active = fin?.activeAdvanceBalance || 0;
-    const advRec = payslip?.advanceDeductions ?? Math.min(active, 3000);
-    const net = payslip?.netPayable ?? (fin?.pendingPayable || 0);
+    const advRec = payslip ? payslip.advanceDeductions : Math.min(active, gross);
+    const net = payslip ? payslip.netPayable : Math.max(0, gross - advRec);
 
     totalGross += gross;
     totalNight += night;
@@ -176,7 +178,7 @@ export default function AdminPayrollScreen() {
 
   const handleExportCsv = async () => {
     setExporting(true);
-    await exportService.exportPayrollReport(staff, summaries, selectedMonth);
+    await exportService.exportPayrollReport(staff, summaries, selectedMonth, allPayslips);
     setExporting(false);
     setExportModalVisible(false);
   };
@@ -185,7 +187,7 @@ export default function AdminPayrollScreen() {
     const res = await dataService.generatePayslip(emp.id, selectedMonth);
     Alert.alert(res.success ? 'Payslip Generated' : 'Notice', res.message);
     if (res.success) {
-      await loadData();
+      await loadData(selectedMonth);
     }
   };
 
@@ -207,7 +209,10 @@ export default function AdminPayrollScreen() {
     const payslip = allPayslips.find(
       (p) => p.employeeId === emp.id && p.monthYear === selectedMonth
     );
-    const payable = payslip?.netPayable ?? (fin?.pendingPayable || 5000);
+    const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
+    const activeAdv = fin?.activeAdvanceBalance || 0;
+    const advRec = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
+    const payable = payslip?.netPayable ?? Math.max(0, gross - advRec);
     setPayAmount(String(payable));
     setPaymentModalVisible(true);
   };
@@ -236,7 +241,7 @@ export default function AdminPayrollScreen() {
     if (res.success) {
       Alert.alert('Payment Recorded', res.message);
       setPaymentModalVisible(false);
-      await loadData();
+      await loadData(selectedMonth);
     } else {
       Alert.alert('Error', res.message);
     }
@@ -472,7 +477,9 @@ export default function AdminPayrollScreen() {
               const presentDays = payslip?.presentDays ?? (fin?.presentDays || 0);
               const nightShifts = payslip?.nightPresentDays ?? (fin?.nightPresentDays || 0);
               const activeAdv = fin?.activeAdvanceBalance || 0;
-              const netPayable = payslip?.netPayable ?? (fin?.pendingPayable || 0);
+              const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
+              const advRec = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
+              const netPayable = payslip?.netPayable ?? Math.max(0, gross - advRec);
               const isPaid = payslip?.paymentStatus === 'PAID';
 
               return (
