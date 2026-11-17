@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
 import { AttendanceRecord, Employee } from '../types';
+import { getNightAllowance } from './settingsService';
 import {
   shareAttendanceReportPdf,
   saveAttendanceReportPdfToPhone,
@@ -89,7 +90,7 @@ export class ExportService {
         const inAddr = rec.checkInLocation?.address || 'N/A';
         const outGps = rec.checkOutLocation ? `${rec.checkOutLocation.latitude.toFixed(5)}, ${rec.checkOutLocation.longitude.toFixed(5)}` : 'N/A';
         const outAddr = rec.checkOutLocation?.address || (rec.checkOutTime ? 'N/A' : 'Active Shift');
-        const allowance = rec.isNightPresent ? 250 : 0;
+        const allowance = rec.isNightPresent ? getNightAllowance() : 0;
 
         // Est Day wage
         let dayWage = 0;
@@ -192,7 +193,7 @@ export class ExportService {
         const payslip = payslips.find((p) => p.employeeId === emp.id && p.monthYear === monthYear);
         const presentDays = payslip?.presentDays ?? (fin?.presentDays || 0);
         const nightShifts = payslip?.nightPresentDays ?? (fin?.nightPresentDays || 0);
-        const nightBonus = nightShifts * 250;
+        const nightBonus = payslip?.nightAllowance ?? (fin?.nightAllowance || 0);
         const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
         const baseShiftEarnings = gross - nightBonus;
         const activeAdv = fin?.activeAdvanceBalance || 0;

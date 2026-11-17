@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { db } from './mockDatabase';
-import { textbeeService } from './textbeeService';
+import { fetchNightAllowance } from './settingsService';
 import {
   Employee,
   AttendanceRecord,
@@ -263,14 +263,6 @@ export class SupabaseService {
       return { success: false, message: error.message };
     }
 
-    // Trigger SMS notification asynchronously
-    this.getEmployeeById(employeeId).then((emp) => {
-      if (emp) {
-        const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-        textbeeService.sendCheckInSms(emp, timeStr, today).catch(() => {});
-      }
-    }).catch(() => {});
-
     return { success: true, message: 'Checked in to Supabase cloud successfully!' };
   }
 
@@ -313,14 +305,6 @@ export class SupabaseService {
     if (error) {
       return { success: false, message: error.message };
     }
-
-    // Trigger checkout SMS notification asynchronously
-    this.getEmployeeById(employeeId).then((emp) => {
-      if (emp) {
-        const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-        textbeeService.sendCheckOutSms(emp, timeStr, isNightPresent).catch(() => {});
-      }
-    }).catch(() => {});
 
     return {
       success: true,
@@ -436,19 +420,6 @@ export class SupabaseService {
 
     if (error) return { success: false, message: error.message };
 
-    // Asynchronously dispatch TextBee SMS alert
-    this.getEmployeeById(tx.employeeId).then(async (emp) => {
-      if (emp) {
-        if (tx.type === 'SALARY_PAYMENT') {
-          const monthYear = tx.notes?.match(/\d{4}-\d{2}/)?.[0] || tx.paymentDate.slice(0, 7);
-          textbeeService.sendSalaryDisbursalSms(emp, tx.amount, tx.paymentMode, monthYear, tx.referenceId).catch(() => {});
-        } else if (tx.type === 'ADVANCE_PAID') {
-          const fin = await this.getEmployeeFinancialSummary(tx.employeeId);
-          textbeeService.sendAdvanceDisbursalSms(emp, tx.amount, tx.paymentMode, fin?.activeAdvanceBalance).catch(() => {});
-        }
-      }
-    }).catch(() => {});
-
     return { success: true, message: 'Transaction recorded in cloud ledger.' };
   }
 
@@ -485,7 +456,7 @@ export class SupabaseService {
       (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(targetMonth) || l.toDate.startsWith(targetMonth))
     );
 
-    const nightAllowance = nightPresentDays * 250;
+    const nightAllowance = nightPresentDays * (await fetchNightAllowance());
     const payableDays = Math.min(presentDays + leaves.length, 30);
     const baseEarnings = emp.salaryType === 'monthly'
       ? Math.round((emp.baseSalary / 30) * payableDays)
@@ -529,6 +500,7 @@ export class SupabaseService {
       totalDays: d.total_days,
       presentDays: d.present_days,
       nightPresentDays: d.night_present_days,
+      nightAllowance: Number(d.night_allowance ?? 0),
       leavesTaken: d.leaves_taken,
       baseSalary: Number(d.base_salary),
       grossEarnings: Number(d.gross_earnings),
@@ -554,7 +526,14 @@ export class SupabaseService {
       (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(monthYear) || l.toDate.startsWith(monthYear))
     );
 
-    const nightAllowance = nightPresentDays * 250;
+    let nightAllowanceRate: number;
+    try {
+      nightAllowanceRate = await fetchNightAllowance();
+    } catch (err) {
+      return { success: false, message: (err as Error).message };
+    }
+
+    const nightAllowance = nightPresentDays * nightAllowanceRate;
     const payableDays = Math.min(presentDays + leaves.length, 30);
     const baseEarnings = emp.salaryType === 'monthly'
       ? Math.round((emp.baseSalary / 30) * payableDays)
@@ -579,6 +558,7 @@ export class SupabaseService {
         .update({
           present_days: presentDays,
           night_present_days: nightPresentDays,
+          night_allowance: nightAllowance,
           leaves_taken: leaves.length,
           base_salary: emp.baseSalary,
           gross_earnings: gross,
@@ -593,9 +573,6 @@ export class SupabaseService {
         return { success: false, message: error?.message || 'Failed to update payslip' };
       }
 
-      // Send SMS alert on payslip recalculation
-      textbeeService.sendPayslipReadySms(emp, monthYear, net).catch(() => {});
-
       return {
         success: true,
         payslip: {
@@ -606,6 +583,7 @@ export class SupabaseService {
           totalDays: data.total_days,
           presentDays: data.present_days,
           nightPresentDays: data.night_present_days,
+          nightAllowance: Number(data.night_allowance ?? 0),
           leavesTaken: data.leaves_taken,
           baseSalary: Number(data.base_salary),
           grossEarnings: Number(data.gross_earnings),
@@ -628,6 +606,7 @@ export class SupabaseService {
           total_days: 30,
           present_days: presentDays,
           night_present_days: nightPresentDays,
+          night_allowance: nightAllowance,
           leaves_taken: leaves.length,
           base_salary: emp.baseSalary,
           gross_earnings: gross,
@@ -643,9 +622,6 @@ export class SupabaseService {
       return { success: false, message: error?.message || 'Failed to generate payslip' };
     }
 
-    // Send SMS alert on new payslip generation
-    textbeeService.sendPayslipReadySms(emp, monthYear, net).catch(() => {});
-
     return {
       success: true,
       payslip: {
@@ -656,6 +632,7 @@ export class SupabaseService {
         totalDays: data.total_days,
         presentDays: data.present_days,
         nightPresentDays: data.night_present_days,
+        nightAllowance: Number(data.night_allowance ?? 0),
         leavesTaken: data.leaves_taken,
         baseSalary: Number(data.base_salary),
         grossEarnings: Number(data.gross_earnings),

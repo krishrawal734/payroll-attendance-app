@@ -75,6 +75,7 @@ export interface Payslip {
   totalDays: number;
   presentDays: number;
   nightPresentDays: number;
+  nightAllowance: number; // total night bonus, frozen at the rate used when generated
   leavesTaken: number;
   baseSalary: number;
   grossEarnings: number;

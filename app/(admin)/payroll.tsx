@@ -114,8 +114,7 @@ export default function AdminPayrollScreen() {
       (p) => p.employeeId === emp.id && p.monthYear === selectedMonth
     );
     const gross = payslip ? payslip.grossEarnings : (fin?.estimatedCurrentEarnings || 0);
-    const nightShifts = payslip ? payslip.nightPresentDays : (fin?.nightPresentDays || 0);
-    const night = nightShifts * 250;
+    const night = payslip ? payslip.nightAllowance : (fin?.nightAllowance || 0);
     const active = fin?.activeAdvanceBalance || 0;
     const advRec = payslip ? payslip.advanceDeductions : Math.min(active, gross);
     const net = payslip ? payslip.netPayable : Math.max(0, gross - advRec);
@@ -504,6 +503,7 @@ export default function AdminPayrollScreen() {
 
               const presentDays = payslip?.presentDays ?? (fin?.presentDays || 0);
               const nightShifts = payslip?.nightPresentDays ?? (fin?.nightPresentDays || 0);
+              const nightBonus = payslip?.nightAllowance ?? (fin?.nightAllowance || 0);
               const activeAdv = fin?.activeAdvanceBalance || 0;
               const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
               const advRec = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
@@ -567,7 +567,7 @@ export default function AdminPayrollScreen() {
                     <View className="flex-1 items-center border-r border-slate-200">
                       <Text className="text-[10px] font-bold text-purple-700 uppercase">Night Shifts</Text>
                       <Text className="text-xs font-black text-purple-700 mt-0.5">
-                        {nightShifts} (+₹{nightShifts * 250})
+                        {nightShifts} (+₹{nightBonus})
                       </Text>
                     </View>
                     <View className="flex-1 items-center border-r border-slate-200">

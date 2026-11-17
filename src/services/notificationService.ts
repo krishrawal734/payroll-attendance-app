@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { getNightAllowance } from './settingsService';
 
 // Configure notification behavior
 try {
@@ -117,7 +118,7 @@ export class NotificationService {
       },
       night: {
         title: '🌙 Night Shift Credit Active (> 7:00 PM)',
-        body: 'Overtime rule unlocked: Checkout after 7:00 PM tagged as Night Present (₹250 bonus)!',
+        body: `Overtime rule unlocked: Checkout after 7:00 PM tagged as Night Present (₹${getNightAllowance()} bonus)!`,
       },
       leave: {
         title: '✅ Leave Approved by Admin',

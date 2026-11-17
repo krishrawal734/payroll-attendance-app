@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Employee } from '../types';
 import { db } from '../services/mockDatabase';
 import { dataService } from '../services/dataService';
+import { fetchNightAllowance } from '../services/settingsService';
 
 const USER_STORAGE_KEY = '@workpulse_auth_user';
 
@@ -40,6 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await AsyncStorage.removeItem(USER_STORAGE_KEY);
             setUser(null);
           } else {
+            await fetchNightAllowance();
             setUser(parsed);
             db.setCurrentUser(parsed);
           }
@@ -57,6 +59,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     const res = await dataService.loginWithMobile(mobileNumber);
     if (res.success && res.user) {
+      try {
+        await fetchNightAllowance();
+      } catch (err) {
+        setIsLoading(false);
+        return { success: false, message: (err as Error).message };
+      }
       db.setCurrentUser(res.user);
       setUser(res.user);
       try {

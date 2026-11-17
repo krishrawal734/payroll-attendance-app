@@ -3,11 +3,12 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { Payslip, Employee, AttendanceRecord } from '../types';
+import { getNightAllowance } from './settingsService';
 
 export function generatePayslipHtml(payslip: Payslip, employee: Employee): string {
   const empCode = `EMP-${employee.id.slice(0, 5).toUpperCase()}`;
   const upiId = employee.bankUpiId || 'Cash Voucher / Bank Transfer';
-  const nightAllowance = payslip.nightPresentDays * 250;
+  const nightAllowance = payslip.nightAllowance;
 
   return `
 <!DOCTYPE html>
@@ -127,7 +128,7 @@ export function generatePayslipHtml(payslip: Payslip, employee: Employee): strin
       <tr>
         <td>
           <strong>Night Shift Allowance</strong><br>
-          <span style="font-size: 10px; color: #7c3aed;">${payslip.nightPresentDays} night shifts × ₹250 bonus</span>
+          <span style="font-size: 10px; color: #7c3aed;">${payslip.nightPresentDays} night shifts × ₹${payslip.nightPresentDays > 0 ? Math.round(nightAllowance / payslip.nightPresentDays) : 0} bonus</span>
         </td>
         <td style="text-align: right; font-weight: 700; color: #7c3aed;">+ ₹${nightAllowance.toLocaleString('en-IN')}</td>
         <td>
@@ -326,7 +327,7 @@ export function generateAttendanceReportHtml(
   const totalLogs = records.length;
   const nightShifts = records.filter((r) => r.isNightPresent).length;
   const regularShifts = totalLogs - nightShifts;
-  const totalAllowance = nightShifts * 250;
+  const totalAllowance = nightShifts * getNightAllowance();
   const uniqueEmployees = new Set(records.map((r) => r.employeeId)).size;
   const generatedAt = new Date().toLocaleString('en-IN', {
     dateStyle: 'medium',
@@ -359,11 +360,11 @@ export function generateAttendanceReportHtml(
       if (emp) {
         if (emp.salaryType === 'daily') {
           salaryTag = `₹${emp.baseSalary.toLocaleString('en-IN')}/day`;
-          dayWage = emp.baseSalary + (rec.isNightPresent ? 250 : 0);
+          dayWage = emp.baseSalary + (rec.isNightPresent ? getNightAllowance() : 0);
         } else {
           const perDay = Math.round(emp.baseSalary / 30);
           salaryTag = `₹${emp.baseSalary.toLocaleString('en-IN')}/mo (~₹${perDay}/d)`;
-          dayWage = perDay + (rec.isNightPresent ? 250 : 0);
+          dayWage = perDay + (rec.isNightPresent ? getNightAllowance() : 0);
         }
       }
       totalEstDayWages += dayWage;
@@ -434,10 +435,10 @@ export function generateAttendanceReportHtml(
         : `<span class="badge badge-other">${rec.status}</span>`;
 
       const nightShiftCell = rec.isNightPresent
-        ? `<div style="font-size: 10px; font-weight: 800; color: #7c3aed;">YES (&gt;7 PM)</div><div style="font-size: 8px; color: #9333ea; font-weight: bold;">+₹250 Night Bonus</div>`
+        ? `<div style="font-size: 10px; font-weight: 800; color: #7c3aed;">YES (&gt;7 PM)</div><div style="font-size: 8px; color: #9333ea; font-weight: bold;">+₹${getNightAllowance()} Night Bonus</div>`
         : `<div style="font-size: 9.5px; color: #64748b; font-weight: 600;">Regular Shift</div>`;
 
-      const allowanceStr = rec.isNightPresent ? '₹250' : '₹0';
+      const allowanceStr = rec.isNightPresent ? `₹${getNightAllowance()}` : '₹0';
 
       return `
       <tr>
@@ -921,7 +922,7 @@ export function generatePayrollRegisterHtml(
 
       const presentDays = payslip?.presentDays ?? (fin?.presentDays || 0);
       const nightShifts = payslip?.nightPresentDays ?? (fin?.nightPresentDays || 0);
-      const nightBonus = nightShifts * 250;
+      const nightBonus = payslip?.nightAllowance ?? (fin?.nightAllowance || 0);
       const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
       const activeAdv = fin?.activeAdvanceBalance || 0;
       const advanceDeduction = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
@@ -973,7 +974,7 @@ export function generatePayrollRegisterHtml(
         </td>
         <td style="text-align: right;">
           <div style="font-weight: 800; color: ${nightBonus > 0 ? '#7c3aed' : '#94a3b8'}; font-size: 10.5px;">₹${nightBonus.toLocaleString('en-IN')}</div>
-          ${nightShifts > 0 ? `<div style="font-size: 8px; color: #9333ea;">(${nightShifts} × ₹250)</div>` : ''}
+          ${nightShifts > 0 ? `<div style="font-size: 8px; color: #9333ea;">(${nightShifts} × ₹${Math.round(nightBonus / nightShifts)})</div>` : ''}
         </td>
         <td style="text-align: right; font-weight: 900; color: #0f172a; font-size: 11px;">
           ₹${gross.toLocaleString('en-IN')}
