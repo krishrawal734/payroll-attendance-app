@@ -20,6 +20,7 @@ import {
 import {
   syncPayslipWithLiveData,
   computeLivePaymentStatus,
+  getLocalMonthYear,
 } from '../../src/services/payrollCalculations';
 import PayslipActionModal from '../../src/components/PayslipActionModal';
 import { exportService } from '../../src/services/exportService';
@@ -41,12 +42,45 @@ import {
   Search,
   Check,
   Building2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react-native';
+
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const FULL_MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+function shiftMonthYear(monthYear: string, delta: number): string {
+  const [y, m] = monthYear.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return getLocalMonthYear(d);
+}
+
+function formatShortMonth(monthYear: string, currentYear: number): string {
+  const [y, m] = monthYear.split('-').map(Number);
+  const label = SHORT_MONTHS[(m || 1) - 1] || monthYear;
+  return y !== currentYear ? `${label} '${String(y).slice(-2)}` : label;
+}
+
+function formatFullMonth(monthYear: string): string {
+  const [y, m] = monthYear.split('-').map(Number);
+  return `${FULL_MONTHS[(m || 1) - 1] || monthYear} ${y}`;
+}
 
 type PayrollFilterType = 'ALL' | 'ADVANCE' | 'SLIP_DONE' | 'SLIP_PENDING';
 
 export default function AdminPayrollScreen() {
-  const [selectedMonth, setSelectedMonth] = useState('2026-11');
+  const currentMonth = getLocalMonthYear();
+  const currentYear = Number(currentMonth.split('-')[0]);
+  const recentMonths = [
+    currentMonth,
+    shiftMonthYear(currentMonth, -1),
+    shiftMonthYear(currentMonth, -2),
+  ];
+
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [payrollFilter, setPayrollFilter] = useState<PayrollFilterType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -328,47 +362,94 @@ export default function AdminPayrollScreen() {
             <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
               Payroll Cycle
             </Text>
-            <Text className="text-lg font-black text-slate-900 mt-0.5">{selectedMonth}</Text>
+            <View className="flex-row items-center mt-0.5">
+              <Text className="text-lg font-black text-slate-900">
+                {formatFullMonth(selectedMonth)}
+              </Text>
+              <View className="ml-2 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200">
+                <Text className="text-[10px] font-bold text-indigo-700">{selectedMonth}</Text>
+              </View>
+            </View>
           </View>
 
-          <View className="flex-row items-center">
-            {/* Export Register Button */}
-            <TouchableOpacity
-              className="flex-row items-center bg-indigo-600 px-3 py-2 rounded-xl mr-2.5"
-              onPress={() => setExportModalVisible(true)}
-              disabled={exporting}
-            >
-              {exporting ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <>
-                  <FileText size={14} color="#ffffff" />
-                  <Text className="text-white text-xs font-black ml-1.5">Export Register</Text>
-                </>
-              )}
-            </TouchableOpacity>
+          {/* Export Register Button */}
+          <TouchableOpacity
+            className="flex-row items-center bg-indigo-600 px-3 py-2 rounded-xl"
+            onPress={() => setExportModalVisible(true)}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <>
+                <FileText size={14} color="#ffffff" />
+                <Text className="text-white text-xs font-black ml-1.5">Export Register</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
 
-            {/* Month Switcher Pills */}
-            <View className="flex-row bg-slate-100 rounded-xl p-1">
-              {['2026-11', '2026-10', '2026-09'].map((m) => {
-                const label = m === '2026-11' ? 'Nov' : m === '2026-10' ? 'Oct' : 'Sep';
+        {/* Dynamic Month Navigator (< Prev | Recent Months | Next >) */}
+        <View className="flex-row items-center justify-between bg-slate-100 rounded-xl p-1 mb-3">
+          <TouchableOpacity
+            className="w-8 h-8 rounded-lg bg-white items-center justify-center border border-slate-200"
+            onPress={() => setSelectedMonth((prev) => shiftMonthYear(prev, -1))}
+          >
+            <ChevronLeft size={16} color="#334155" />
+          </TouchableOpacity>
+
+          <View className="flex-row items-center flex-1 justify-center mx-1.5">
+            {!recentMonths.includes(selectedMonth) ? (
+              <>
+                <View className="px-3 py-1 rounded-lg bg-white border border-indigo-200 mr-1.5">
+                  <Text className="text-xs font-extrabold text-indigo-600">
+                    {formatShortMonth(selectedMonth, currentYear)}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  className="px-2.5 py-1 rounded-lg bg-indigo-600"
+                  onPress={() => setSelectedMonth(currentMonth)}
+                >
+                  <Text className="text-[11px] font-bold text-white">Current</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              recentMonths.map((m) => {
                 const active = selectedMonth === m;
                 return (
                   <TouchableOpacity
                     key={m}
-                    className={`px-2.5 py-1 rounded-lg ${active ? 'bg-white' : ''}`}
+                    className={`px-3 py-1.5 rounded-lg mx-0.5 ${
+                      active ? 'bg-white border border-indigo-200' : ''
+                    }`}
                     onPress={() => setSelectedMonth(m)}
                   >
                     <Text
-                      className={`text-xs font-bold ${active ? 'text-indigo-600' : 'text-slate-500'}`}
+                      className={`text-xs font-bold ${
+                        active ? 'text-indigo-600' : 'text-slate-500'
+                      }`}
                     >
-                      {label}
+                      {formatShortMonth(m, currentYear)}
                     </Text>
                   </TouchableOpacity>
                 );
-              })}
-            </View>
+              })
+            )}
           </View>
+
+          <TouchableOpacity
+            className={`w-8 h-8 rounded-lg bg-white items-center justify-center border border-slate-200 ${
+              selectedMonth >= currentMonth ? 'opacity-40' : ''
+            }`}
+            disabled={selectedMonth >= currentMonth}
+            onPress={() =>
+              setSelectedMonth((prev) =>
+                prev < currentMonth ? shiftMonthYear(prev, 1) : prev
+              )
+            }
+          >
+            <ChevronRight size={16} color="#334155" />
+          </TouchableOpacity>
         </View>
 
         {/* Search Bar */}
@@ -794,7 +875,7 @@ export default function AdminPayrollScreen() {
                 </Text>
               </View>
               <View className="flex-row justify-between mb-1.5">
-                <Text className="text-xs text-purple-700">Night Allowances (&gt;7 PM):</Text>
+                <Text className="text-xs text-purple-700">Night Allowances (9 PM–5 AM):</Text>
                 <Text className="text-xs font-black text-purple-700">
                   + ₹{totalNight.toLocaleString('en-IN')}
                 </Text>

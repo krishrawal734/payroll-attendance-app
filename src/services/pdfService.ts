@@ -124,7 +124,7 @@ export function generatePayslipHtml(
     </div>
     <div class="stat-item">
       <div class="stat-val" style="color: #7c3aed;">${payslip.nightPresentDays}</div>
-      <div class="stat-label">Night Present (> 7 PM)</div>
+      <div class="stat-label">Night Present (9 PM–5 AM)</div>
     </div>
     <div class="stat-item">
       <div class="stat-val" style="color: #d97706;">${payslip.leavesTaken}</div>
@@ -482,13 +482,13 @@ export function generateAttendanceReportHtml(
 
       // Status Badges
       const statusBadge = rec.isNightPresent
-        ? `<span class="badge badge-night">🌙 NIGHT PRESENT (&gt;7 PM)</span>`
+        ? `<span class="badge badge-night">🌙 NIGHT PRESENT (9 PM–5 AM)</span>`
         : rec.status === 'PRESENT'
         ? `<span class="badge badge-present">☀️ DAY PRESENT</span>`
         : `<span class="badge badge-other">${rec.status}</span>`;
 
       const nightShiftCell = rec.isNightPresent
-        ? `<div style="font-size: 10px; font-weight: 800; color: #7c3aed;">YES (&gt;7 PM)</div><div style="font-size: 8px; color: #9333ea; font-weight: bold;">+₹250 Night Bonus</div>`
+        ? `<div style="font-size: 10px; font-weight: 800; color: #7c3aed;">YES (9 PM–5 AM)</div><div style="font-size: 8px; color: #9333ea; font-weight: bold;">+₹250 Night Bonus</div>`
         : `<div style="font-size: 9.5px; color: #64748b; font-weight: 600;">Regular Shift</div>`;
 
       const allowanceStr = rec.isNightPresent ? '₹250' : '₹0';
@@ -730,7 +730,7 @@ export function generateAttendanceReportHtml(
     </div>
     <div class="summary-card">
       <div class="summary-num" style="color: #7c3aed;">${nightShifts}</div>
-      <div class="summary-label">Night Present (>7 PM)</div>
+      <div class="summary-label">Night Present (9 PM–5 AM)</div>
     </div>
     <div class="summary-card">
       <div class="summary-num" style="color: #0284c7;">₹${totalAllowance.toLocaleString('en-IN')}</div>
@@ -773,7 +773,7 @@ export function generateAttendanceReportHtml(
           ${totalLogs} Present
         </td>
         <td colspan="2" style="font-size: 9.5px; color: #334155;">
-          <strong>Breakdown:</strong> ${regularShifts} Day Shifts • ${nightShifts} Night Shifts (&gt;7 PM)
+          <strong>Breakdown:</strong> ${regularShifts} Day Shifts • ${nightShifts} Night Shifts (9 PM–5 AM)
         </td>
         <td style="text-align: center; font-weight: 800; font-size: 10px;">
           ${totalHoursStr}

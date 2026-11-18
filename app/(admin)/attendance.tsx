@@ -108,7 +108,7 @@ export default function AdminAttendanceScreen() {
       case 'NIGHT':
         return {
           records: allRecords.filter((r) => r.isNightPresent),
-          periodLabel: 'Night Shifts (>7:00 PM) Audit',
+          periodLabel: 'Night Shifts (9 PM–5 AM) Audit',
           reportTitle: 'NIGHT SHIFT ATTENDANCE AUDIT REPORT',
           shortLabel: 'Night Shifts',
         };
@@ -313,7 +313,7 @@ export default function AdminAttendanceScreen() {
                 filter === 'NIGHT' ? 'text-white' : 'text-purple-700'
               }`}
             >
-              Night (&gt;7 PM)
+              Night (9 PM–5 AM)
             </Text>
           </TouchableOpacity>
 
@@ -374,7 +374,7 @@ export default function AdminAttendanceScreen() {
                     {record.isNightPresent ? (
                       <View className="flex-row items-center bg-purple-100 px-2 py-0.5 rounded-full">
                         <Moon size={10} color="#7c3aed" />
-                        <Text className="text-[10px] font-bold text-purple-700 ml-1">Night Present (&gt;7 PM)</Text>
+                        <Text className="text-[10px] font-bold text-purple-700 ml-1">Night Present (9 PM–5 AM)</Text>
                       </View>
                     ) : (
                       <View className="flex-row items-center bg-emerald-100 px-2 py-0.5 rounded-full">

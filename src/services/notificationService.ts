@@ -87,11 +87,11 @@ export class NotificationService {
         },
       });
 
-      // Evening Night Shift Alert (7:00 PM / 19:00)
+      // Evening Grace Window Reminder (7:00 PM / 19:00)
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '🌙 Night Shift Rule Active (7:00 PM)',
-          body: 'Punching out now automatically marks attendance as Night Present with shift allowance!',
+          title: '⏳ Day Shift Ending — Punch Out Before 9:00 PM',
+          body: 'Day shift ended at 7:00 PM. Punch out before 9:00 PM before Night Shift starts.',
           sound: true,
         },
         trigger: {
@@ -102,7 +102,22 @@ export class NotificationService {
         },
       });
 
-      return { success: true, message: 'Daily shift reminders scheduled (9:00 AM & 7:00 PM).' };
+      // Night Shift Start Alert (9:00 PM / 21:00)
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '🌙 Night Shift Started (9:00 PM – 5:00 AM)',
+          body: 'Night shift is now active (+₹250 allowance). Open shifts auto punch-out at 5:00 AM.',
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          channelId: Platform.OS === 'android' ? 'workpulse-alerts' : undefined,
+          hour: 21,
+          minute: 0,
+        },
+      });
+
+      return { success: true, message: 'Daily shift reminders scheduled (9:00 AM, 7:00 PM & 9:00 PM).' };
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed to schedule reminders' };
     }

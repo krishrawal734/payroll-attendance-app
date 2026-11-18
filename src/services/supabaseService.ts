@@ -5,6 +5,14 @@ import {
   getAdvanceRecoveryNote,
 } from './payrollCalculations';
 import {
+  AUTO_CHECKOUT_ADDRESS,
+  AUTO_CHECKOUT_NOTE,
+  evaluateAutoCheckout,
+  getLocalDateStr,
+  isInGraceWindow,
+  isNightShiftManualCheckout,
+} from './shiftRules';
+import {
   Employee,
   AttendanceRecord,
   LeaveRequest,
@@ -190,17 +198,9 @@ export class SupabaseService {
     };
   }
 
-  // --- Attendance ---
-  async getAttendance(employeeId?: string): Promise<AttendanceRecord[]> {
-    let query = supabase.from('attendance').select('*').order('date', { ascending: false });
-    if (employeeId) {
-      if (!this.isUUID(employeeId)) return db.getAttendance(employeeId);
-      query = query.eq('employee_id', employeeId);
-    }
-    const { data, error } = await query;
-    if (error || !data) return [];
-
-    return data.map((d: any) => ({
+  // Helper to map Supabase attendance row to AttendanceRecord
+  private mapAttendance(d: any): AttendanceRecord {
+    return {
       id: d.id,
       employeeId: d.employee_id,
       date: d.date,
@@ -223,14 +223,99 @@ export class SupabaseService {
       isNightPresent: Boolean(d.is_night_present),
       status: d.status,
       notes: d.notes,
-    }));
+    };
+  }
+
+  /**
+   * Automatically punches out any open shift whose 5:00 AM Night Shift cutoff has passed.
+   * Ensures reliable auto punch-out at 5:00 AM even if the phone was off overnight.
+   */
+  private async processAutoNightCheckouts(employeeId?: string): Promise<void> {
+    try {
+      let query = supabase
+        .from('attendance')
+        .select('*')
+        .not('check_in_time', 'is', null)
+        .is('check_out_time', null);
+
+      if (employeeId) {
+        if (!this.isUUID(employeeId)) return;
+        query = query.eq('employee_id', employeeId);
+      }
+
+      const { data: openRows } = await query;
+      if (!openRows || openRows.length === 0) return;
+
+      const now = new Date();
+      for (const row of openRows) {
+        const { shouldAutoClose, cutoffTime } = evaluateAutoCheckout(
+          {
+            date: row.date,
+            checkInTime: row.check_in_time,
+            checkOutTime: row.check_out_time,
+          },
+          now
+        );
+
+        if (shouldAutoClose) {
+          await supabase
+            .from('attendance')
+            .update({
+              check_out_time: cutoffTime.toISOString(),
+              check_out_address: AUTO_CHECKOUT_ADDRESS,
+              is_night_present: true,
+              notes: AUTO_CHECKOUT_NOTE,
+            })
+            .eq('id', row.id);
+        }
+      }
+    } catch {
+      // Non-fatal — retry on next load
+    }
+  }
+
+  // --- Attendance ---
+  async getAttendance(employeeId?: string): Promise<AttendanceRecord[]> {
+    if (employeeId && !this.isUUID(employeeId)) {
+      return db.getAttendance(employeeId);
+    }
+
+    await this.processAutoNightCheckouts(employeeId);
+
+    let query = supabase.from('attendance').select('*').order('date', { ascending: false });
+    if (employeeId) {
+      query = query.eq('employee_id', employeeId);
+    }
+    const { data, error } = await query;
+    if (error || !data) return [];
+
+    return data.map((d: any) => this.mapAttendance(d));
   }
 
   async getTodayAttendance(employeeId: string): Promise<AttendanceRecord | undefined> {
-    const today = new Date().toISOString().split('T')[0];
     if (!this.isUUID(employeeId)) {
       return db.getTodayAttendance(employeeId);
     }
+
+    await this.processAutoNightCheckouts(employeeId);
+
+    // 1. Check if employee has an active open overnight shift (e.g., 9 PM – 4:59 AM)
+    const { data: openShift } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .not('check_in_time', 'is', null)
+      .is('check_out_time', null)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (openShift) {
+      return this.mapAttendance(openShift);
+    }
+
+    // 2. Otherwise fetch today's local date record
+    const today = getLocalDateStr();
     const { data, error } = await supabase
       .from('attendance')
       .select('*')
@@ -239,40 +324,32 @@ export class SupabaseService {
       .maybeSingle();
 
     if (error || !data) return undefined;
-    return {
-      id: data.id,
-      employeeId: data.employee_id,
-      date: data.date,
-      checkInTime: data.check_in_time,
-      checkInLocation: data.check_in_lat
-        ? {
-            latitude: Number(data.check_in_lat),
-            longitude: Number(data.check_in_lng),
-            address: data.check_in_address,
-          }
-        : undefined,
-      checkOutTime: data.check_out_time,
-      checkOutLocation: data.check_out_lat
-        ? {
-            latitude: Number(data.check_out_lat),
-            longitude: Number(data.check_out_lng),
-            address: data.check_out_address,
-          }
-        : undefined,
-      isNightPresent: Boolean(data.is_night_present),
-      status: data.status,
-      notes: data.notes,
-    };
+    return this.mapAttendance(data);
   }
 
   async checkIn(employeeId: string, loc: AttendanceLocation): Promise<{ success: boolean; message: string }> {
-    const today = new Date().toISOString().split('T')[0];
-
     if (!this.isUUID(employeeId)) {
       const res = db.checkIn(employeeId, loc);
       return { success: res.success, message: res.message };
     }
 
+    await this.processAutoNightCheckouts(employeeId);
+
+    // Prevent check-in if an overnight shift is still open
+    const { data: activeOpen } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .not('check_in_time', 'is', null)
+      .is('check_out_time', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (activeOpen) {
+      return { success: false, message: 'You already have an active open shift. Please punch out first.' };
+    }
+
+    const today = getLocalDateStr();
     const { data: existing } = await supabase
       .from('attendance')
       .select('*')
@@ -305,28 +382,42 @@ export class SupabaseService {
   }
 
   async checkOut(employeeId: string, loc: AttendanceLocation): Promise<{ success: boolean; isNightPresent?: boolean; message: string }> {
-    const today = new Date().toISOString().split('T')[0];
-    const now = new Date();
-    const isNightPresent = now.getHours() >= 19; // After 7:00 PM
-
     if (!this.isUUID(employeeId)) {
       const res = db.checkOut(employeeId, loc);
       return { success: res.success, isNightPresent: res.record?.isNightPresent, message: res.message };
     }
 
-    const { data: existing } = await supabase
+    await this.processAutoNightCheckouts(employeeId);
+
+    // Find active open shift (supports overnight 9 PM – 5 AM checkout after midnight)
+    const { data: openShift } = await supabase
       .from('attendance')
       .select('*')
       .eq('employee_id', employeeId)
-      .eq('date', today)
+      .not('check_in_time', 'is', null)
+      .is('check_out_time', null)
+      .order('date', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    if (!existing || !existing.check_in_time) {
+    if (!openShift) {
+      const today = getLocalDateStr();
+      const { data: todayRow } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('date', today)
+        .maybeSingle();
+
+      if (todayRow?.check_out_time) {
+        return { success: false, message: 'You have already checked out for today.' };
+      }
       return { success: false, message: 'Please check in first before checking out.' };
     }
-    if (existing.check_out_time) {
-      return { success: false, message: 'You have already checked out for today.' };
-    }
+
+    const now = new Date();
+    const isNightPresent = isNightShiftManualCheckout(now); // true only 9:00 PM – 4:59 AM
+    const inGrace = isInGraceWindow(now); // 7:00 PM – 8:59 PM
 
     const { error } = await supabase
       .from('attendance')
@@ -336,9 +427,13 @@ export class SupabaseService {
         check_out_lng: loc.longitude,
         check_out_address: loc.address,
         is_night_present: isNightPresent,
+        notes: inGrace
+          ? 'Punched out during 7:00 PM – 9:00 PM grace window (before Night Shift)'
+          : isNightPresent
+            ? 'Night Shift Punch-Out (9:00 PM – 5:00 AM)'
+            : undefined,
       })
-      .eq('employee_id', employeeId)
-      .eq('date', today);
+      .eq('id', openShift.id);
 
     if (error) {
       return { success: false, message: error.message };
@@ -348,8 +443,10 @@ export class SupabaseService {
       success: true,
       isNightPresent,
       message: isNightPresent
-        ? 'Checked out! Auto-marked as Night Present (> 7:00 PM) in cloud.'
-        : 'Checked out successfully in cloud.',
+        ? 'Checked out during Night Shift (9:00 PM – 5:00 AM)! Marked as Night Present (+₹250).'
+        : inGrace
+          ? 'Checked out before 9:00 PM Night Shift start (regular Day Shift recorded).'
+          : 'Checked out successfully in cloud.',
     };
   }
 

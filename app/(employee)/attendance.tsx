@@ -13,6 +13,11 @@ import { dataService } from '../../src/services/dataService';
 import { AttendanceRecord } from '../../src/types';
 import { getCurrentAttendanceLocation } from '../../src/services/locationService';
 import {
+  isInGraceWindow,
+  isInNightShiftWindow,
+  evaluateAutoCheckout,
+} from '../../src/services/shiftRules';
+import {
   MapPin,
   Clock,
   Moon,
@@ -130,6 +135,15 @@ export default function EmployeeAttendanceScreen() {
     loadData();
   }, [user?.id]);
 
+  // Trigger live auto punch-out right at 5:00 AM if app is open during Night Shift
+  useEffect(() => {
+    if (!todayRecord || !todayRecord.checkInTime || todayRecord.checkOutTime) return;
+    const { shouldAutoClose } = evaluateAutoCheckout(todayRecord, now);
+    if (shouldAutoClose) {
+      loadData();
+    }
+  }, [now, todayRecord?.id, todayRecord?.checkOutTime]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadData();
@@ -137,7 +151,8 @@ export default function EmployeeAttendanceScreen() {
 
   if (!user) return null;
 
-  const isAfter7PM = now.getHours() >= 19; // 19:00 = 7:00 PM
+  const inGraceWindow = isInGraceWindow(now); // 7:00 PM – 8:59 PM (chance to punch out before Night Shift)
+  const inNightShift = isInNightShiftWindow(now); // 9:00 PM – 4:59 AM (Night Shift, auto punch-out at 5:00 AM)
 
   const handleCheckIn = async () => {
     setLoading(true);
@@ -219,19 +234,26 @@ export default function EmployeeAttendanceScreen() {
           {now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </Text>
 
-        {/* Night Rule Badge */}
-        {isAfter7PM ? (
+        {/* Shift Window Badge */}
+        {inNightShift ? (
           <View className="flex-row items-center bg-purple-950/80 border border-purple-600 px-3 py-2 rounded-xl mt-3.5">
             <Moon size={15} color="#c084fc" />
             <Text className="text-purple-200 text-xs font-bold ml-2 flex-1">
-              Night Shift Rule Active: Punching out now marks attendance as NIGHT PRESENT.
+              Night Shift Active (9:00 PM – 5:00 AM): Marks NIGHT PRESENT (+₹250). Auto punch-out at 5:00 AM.
+            </Text>
+          </View>
+        ) : inGraceWindow ? (
+          <View className="flex-row items-center bg-amber-950/80 border border-amber-500 px-3 py-2 rounded-xl mt-3.5">
+            <Clock size={15} color="#fbbf24" />
+            <Text className="text-amber-200 text-xs font-bold ml-2 flex-1">
+              Grace Window (7:00 PM – 9:00 PM): Punch out before 9:00 PM for Day Shift. Night Shift starts at 9:00 PM.
             </Text>
           </View>
         ) : (
           <View className="flex-row items-center bg-slate-800 px-3 py-2 rounded-xl mt-3.5">
             <Clock size={14} color="#94a3b8" />
             <Text className="text-slate-400 text-xs ml-2 flex-1">
-              Standard shift. Check out after 7:00 PM for Night Present credit.
+              Day Shift (ends 7 PM, grace until 9 PM). Night Shift: 9:00 PM – 5:00 AM (auto punch-out).
             </Text>
           </View>
         )}
@@ -304,17 +326,23 @@ export default function EmployeeAttendanceScreen() {
               disabled={!todayRecord?.checkInTime || !!todayRecord?.checkOutTime}
               onPress={handleCheckOut}
             >
-              {isAfter7PM ? <Moon size={22} color="#ffffff" /> : <Clock size={22} color="#ffffff" />}
+              {inNightShift ? <Moon size={22} color="#ffffff" /> : <Clock size={22} color="#ffffff" />}
               <View className="ml-3.5 flex-1">
                 <Text className="text-white text-base font-black tracking-wide">
-                  {isAfter7PM ? 'PUNCH OUT (NIGHT PRESENT)' : 'PUNCH OUT (GPS)'}
+                  {inNightShift
+                    ? 'PUNCH OUT (NIGHT SHIFT)'
+                    : inGraceWindow
+                      ? 'PUNCH OUT (BEFORE 9 PM)'
+                      : 'PUNCH OUT (GPS)'}
                 </Text>
                 <Text className="text-white/80 text-xs mt-0.5">
                   {todayRecord?.checkOutTime
                     ? `Done at ${new Date(todayRecord.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                    : isAfter7PM
-                    ? 'Qualifies for Night Present (> 7 PM)'
-                    : 'Tap when leaving shift'}
+                    : inNightShift
+                      ? 'Night Shift (9 PM – 5 AM) • Auto punch-out at 5:00 AM'
+                      : inGraceWindow
+                        ? 'Grace window: punch out before 9:00 PM for Day Shift'
+                        : 'Tap when leaving shift'}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -356,7 +384,7 @@ export default function EmployeeAttendanceScreen() {
                 {record.isNightPresent ? (
                   <View className="flex-row items-center bg-purple-100 px-2 py-0.5 rounded-full">
                     <Moon size={10} color="#7c3aed" />
-                    <Text className="text-[10px] font-bold text-purple-700 ml-1">Night Present (&gt;7 PM)</Text>
+                    <Text className="text-[10px] font-bold text-purple-700 ml-1">Night Present (9 PM–5 AM)</Text>
                   </View>
                 ) : (
                   <View className="bg-emerald-100 px-2 py-0.5 rounded-full">

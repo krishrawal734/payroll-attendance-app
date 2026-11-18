@@ -12,6 +12,14 @@ import {
   computeEmployeeMonthlyPayroll,
   getAdvanceRecoveryNote,
 } from './payrollCalculations';
+import {
+  AUTO_CHECKOUT_ADDRESS,
+  AUTO_CHECKOUT_NOTE,
+  evaluateAutoCheckout,
+  getLocalDateStr,
+  isInGraceWindow,
+  isNightShiftManualCheckout,
+} from './shiftRules';
 
 class MockDatabase {
   private employees: Employee[] = [];
@@ -83,8 +91,27 @@ class MockDatabase {
     return { success: true, employee: newEmp, message: 'Employee registered successfully!' };
   }
 
+  private processAutoNightCheckouts(employeeId?: string) {
+    const now = new Date();
+    for (const rec of this.attendance) {
+      if (employeeId && rec.employeeId !== employeeId) continue;
+      const { shouldAutoClose, cutoffTime } = evaluateAutoCheckout(rec, now);
+      if (shouldAutoClose) {
+        rec.checkOutTime = cutoffTime.toISOString();
+        rec.checkOutLocation = {
+          latitude: rec.checkInLocation?.latitude || 0,
+          longitude: rec.checkInLocation?.longitude || 0,
+          address: AUTO_CHECKOUT_ADDRESS,
+        };
+        rec.isNightPresent = true;
+        rec.notes = AUTO_CHECKOUT_NOTE;
+      }
+    }
+  }
+
   // --- Attendance Methods ---
   getAttendance(employeeId?: string): AttendanceRecord[] {
+    this.processAutoNightCheckouts(employeeId);
     if (employeeId) {
       return this.attendance.filter((a) => a.employeeId === employeeId);
     }
@@ -92,17 +119,27 @@ class MockDatabase {
   }
 
   getTodayAttendance(employeeId: string): AttendanceRecord | undefined {
-    const today = new Date().toISOString().split('T')[0];
+    this.processAutoNightCheckouts(employeeId);
+    const activeOpen = this.attendance.find(
+      (a) => a.employeeId === employeeId && Boolean(a.checkInTime) && !a.checkOutTime
+    );
+    if (activeOpen) return activeOpen;
+
+    const today = getLocalDateStr();
     return this.attendance.find((a) => a.employeeId === employeeId && a.date === today);
   }
 
   checkIn(employeeId: string, location: AttendanceLocation): { success: boolean; record?: AttendanceRecord; message: string } {
-    const today = new Date().toISOString().split('T')[0];
+    this.processAutoNightCheckouts(employeeId);
     const existing = this.getTodayAttendance(employeeId);
+    if (existing && existing.checkInTime && !existing.checkOutTime) {
+      return { success: false, message: 'You already have an active open shift. Please punch out first.' };
+    }
     if (existing && existing.checkInTime) {
       return { success: false, message: 'You have already checked in for today!' };
     }
 
+    const today = getLocalDateStr();
     const newRecord: AttendanceRecord = {
       id: `att_${Date.now()}`,
       employeeId,
@@ -123,9 +160,9 @@ class MockDatabase {
     return { success: true, record: newRecord, message: 'Checked in successfully!' };
   }
 
-  // REQUIREMENT 1: If an employee checks out after 7:00 PM (19:00), automatically mark attendance as Night Present
+  // Shift Rules: 7 PM – 8:59 PM grace window (normal Day Shift); 9 PM – 5 AM Night Shift (auto punch-out at 5 AM)
   checkOut(employeeId: string, location: AttendanceLocation): { success: boolean; record?: AttendanceRecord; message: string } {
-    const today = new Date().toISOString().split('T')[0];
+    this.processAutoNightCheckouts(employeeId);
     const existing = this.getTodayAttendance(employeeId);
 
     if (!existing || !existing.checkInTime) {
@@ -136,22 +173,26 @@ class MockDatabase {
     }
 
     const now = new Date();
-    const checkOutIso = now.toISOString();
+    const isNightPresent = isNightShiftManualCheckout(now); // true only 9:00 PM – 4:59 AM
+    const inGrace = isInGraceWindow(now); // 7:00 PM – 8:59 PM
 
-    // Check if after 7:00 PM (19:00 hours in local time)
-    const hours = now.getHours();
-    const isNightPresent = hours >= 19; // 19:00 or later = 7:00 PM or later
-
-    existing.checkOutTime = checkOutIso;
+    existing.checkOutTime = now.toISOString();
     existing.checkOutLocation = location;
     existing.isNightPresent = isNightPresent;
+    if (inGrace) {
+      existing.notes = 'Punched out during 7:00 PM – 9:00 PM grace window (before Night Shift)';
+    } else if (isNightPresent) {
+      existing.notes = 'Night Shift Punch-Out (9:00 PM – 5:00 AM)';
+    }
 
     return {
       success: true,
       record: existing,
       message: isNightPresent
-        ? 'Checked out! Auto-marked as Night Present (Checkout after 7:00 PM).'
-        : 'Checked out successfully.',
+        ? 'Checked out during Night Shift (9:00 PM – 5:00 AM)! Marked as Night Present (+₹250).'
+        : inGrace
+          ? 'Checked out before 9:00 PM Night Shift start (regular Day Shift recorded).'
+          : 'Checked out successfully.',
     };
   }
 

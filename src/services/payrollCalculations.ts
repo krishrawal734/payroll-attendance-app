@@ -10,6 +10,15 @@ import {
 export const NIGHT_SHIFT_ALLOWANCE = 250;
 export const MONTHLY_DIVISOR_DAYS = 30;
 
+/**
+ * Returns local YYYY-MM (avoids UTC midnight off-by-one-month shift in IST).
+ */
+export function getLocalMonthYear(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
 export function getAdvanceRecoveryNote(monthYear: string): string {
   return `Advance recovery for ${monthYear} salary`;
 }
@@ -84,7 +93,7 @@ export function computeEmployeeMonthlyPayroll(
   allTransactions: SalaryTransaction[],
   monthYear?: string
 ): MonthlyPayrollBreakdown {
-  const targetMonth = monthYear || new Date().toISOString().slice(0, 7);
+  const targetMonth = monthYear || getLocalMonthYear();
 
   // 1. Verified Attendance for targetMonth
   const monthAttendance = allAttendance.filter((a) => a.date.startsWith(targetMonth));

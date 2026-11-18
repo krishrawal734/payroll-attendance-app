@@ -232,7 +232,7 @@ export default function AdminDashboard() {
               <View className="flex-1 mr-2">
                 <Text className="text-sm font-bold text-slate-900">Attendance & Night Present</Text>
                 <Text className="text-xs text-slate-500 mt-0.5">
-                  Track GPS coordinates, verify mock locations & &gt;7 PM punches.
+                  Track GPS coordinates, verify mock locations &amp; 9 PM–5 AM night shifts.
                 </Text>
               </View>
               <ChevronRight size={16} color="#94a3b8" />

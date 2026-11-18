@@ -167,7 +167,7 @@ export default function EmployeeDashboard() {
             <Moon size={18} color="#7c3aed" />
           </View>
           <Text className="text-2xl font-black text-purple-900">{finSummary?.nightPresentDays || 0}</Text>
-          <Text className="text-xs text-purple-700 mt-0.5 font-bold">Night Present (&gt;7 PM)</Text>
+          <Text className="text-xs text-purple-700 mt-0.5 font-bold">Night Shift (9 PM–5 AM)</Text>
         </View>
 
         {/* Leaves Taken */}
@@ -282,7 +282,7 @@ export default function EmployeeDashboard() {
               {item.isNightPresent ? (
                 <View className="flex-row items-center bg-purple-100 px-2 py-1 rounded-md">
                   <Moon size={10} color="#7c3aed" />
-                  <Text className="text-[10px] font-bold text-purple-700 ml-1">Night (&gt;7 PM)</Text>
+                  <Text className="text-[10px] font-bold text-purple-700 ml-1">Night (9 PM–5 AM)</Text>
                 </View>
               ) : (
                 <View className="flex-row items-center bg-emerald-100 px-2 py-1 rounded-md">
