@@ -22,6 +22,8 @@ import {
   X,
   Send,
   ChevronLeft,
+  ShieldCheck,
+  RotateCcw,
 } from 'lucide-react-native';
 
 export default function EmployeeDetailScreen() {
@@ -35,6 +37,7 @@ export default function EmployeeDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [resetting2fa, setResetting2fa] = useState(false);
 
   // Form State
   const [txType, setTxType] = useState<TransactionType>('ADVANCE_PAID');
@@ -142,6 +145,31 @@ export default function EmployeeDetailScreen() {
     });
   };
 
+  const handleResetAuthenticator = () => {
+    Alert.alert(
+      'Reset Google Authenticator?',
+      `This will unlink Google Authenticator for ${employee.fullName}. On their next login, they will be asked to link Google Authenticator again.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset 2FA',
+          style: 'destructive',
+          onPress: async () => {
+            setResetting2fa(true);
+            const res = await dataService.resetTotp(employee.id);
+            setResetting2fa(false);
+            if (res.success) {
+              Alert.alert('Authenticator Reset', res.message);
+              await loadData();
+            } else {
+              Alert.alert('Error', res.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <ScrollView
       className="flex-1 bg-slate-50"
@@ -188,6 +216,65 @@ export default function EmployeeDetailScreen() {
               {employee.bankUpiId || 'Not Set'}
             </Text>
           </View>
+        </View>
+
+        {/* Google Authenticator 2FA Status & Reset */}
+        <View
+          style={{
+            marginTop: 14,
+            paddingTop: 12,
+            borderTopWidth: 1,
+            borderTopColor: '#f1f5f9',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <ShieldCheck
+              size={16}
+              color={employee.is2faEnabled ? '#059669' : '#d97706'}
+            />
+            <View>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748b', textTransform: 'uppercase' }}>
+                Google Authenticator
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '800',
+                  color: employee.is2faEnabled ? '#047857' : '#b45309',
+                  marginTop: 1,
+                }}
+              >
+                {employee.is2faEnabled ? 'Linked & Active' : 'Pending First-Time Setup'}
+              </Text>
+            </View>
+          </View>
+
+          {employee.is2faEnabled && (
+            <TouchableOpacity
+              disabled={resetting2fa}
+              onPress={handleResetAuthenticator}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+                paddingHorizontal: 11,
+                paddingVertical: 7,
+                borderRadius: 10,
+                backgroundColor: '#fef2f2',
+                borderWidth: 1,
+                borderColor: '#fecaca',
+                opacity: resetting2fa ? 0.5 : 1,
+              }}
+            >
+              <RotateCcw size={13} color="#dc2626" />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#dc2626' }}>
+                {resetting2fa ? 'Resetting...' : 'Reset 2FA'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

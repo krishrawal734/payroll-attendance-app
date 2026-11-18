@@ -49,6 +49,22 @@ class MockDatabase {
     return this.employees.find((e) => e.id === id);
   }
 
+  saveTotpSecret(employeeId: string, secret: string): { success: boolean; message: string } {
+    const emp = this.employees.find((e) => e.id === employeeId);
+    if (!emp) return { success: false, message: 'Employee not found.' };
+    emp.totpSecret = secret;
+    emp.is2faEnabled = true;
+    return { success: true, message: 'Google Authenticator linked successfully!' };
+  }
+
+  resetTotp(employeeId: string): { success: boolean; message: string } {
+    const emp = this.employees.find((e) => e.id === employeeId);
+    if (!emp) return { success: false, message: 'Employee not found.' };
+    emp.totpSecret = null;
+    emp.is2faEnabled = false;
+    return { success: true, message: 'Google Authenticator reset successfully.' };
+  }
+
   addEmployee(data: Omit<Employee, 'id' | 'isActive'>): { success: boolean; employee?: Employee; message: string } {
     const existing = this.employees.find((e) => e.mobileNumber === data.mobileNumber);
     if (existing) {

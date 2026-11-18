@@ -3,7 +3,12 @@
 -- Copy and run this in your Supabase SQL Editor (Run button)
 -- ============================================================
 
--- 1. Enable RLS and add open permissions for mobile app
+-- 1. Ensure Google Authenticator 2FA columns exist on employees
+ALTER TABLE public.employees
+  ADD COLUMN IF NOT EXISTS totp_secret TEXT,
+  ADD COLUMN IF NOT EXISTS is_2fa_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- 2. Enable RLS and add open permissions for mobile app
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leave_requests ENABLE ROW LEVEL SECURITY;

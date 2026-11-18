@@ -23,6 +23,20 @@ export class DataService {
     return db.loginWithMobile(mobileNumber);
   }
 
+  async saveTotpSecret(employeeId: string, secret: string): Promise<{ success: boolean; message: string }> {
+    if (this.isCloud()) {
+      return await supabaseService.saveTotpSecret(employeeId, secret);
+    }
+    return db.saveTotpSecret(employeeId, secret);
+  }
+
+  async resetTotp(employeeId: string): Promise<{ success: boolean; message: string }> {
+    if (this.isCloud()) {
+      return await supabaseService.resetTotp(employeeId);
+    }
+    return db.resetTotp(employeeId);
+  }
+
   async getEmployees(): Promise<Employee[]> {
     if (this.isCloud()) {
       return await supabaseService.getEmployees();

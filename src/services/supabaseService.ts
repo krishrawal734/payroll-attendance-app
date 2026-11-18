@@ -17,6 +17,24 @@ export class SupabaseService {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
   }
 
+  // Helper to map Supabase employee row to Employee type
+  private mapEmployee(d: any): Employee {
+    return {
+      id: d.id,
+      fullName: d.full_name,
+      mobileNumber: d.mobile_number,
+      role: d.role,
+      designation: d.designation,
+      baseSalary: Number(d.base_salary),
+      salaryType: d.salary_type,
+      joiningDate: d.joining_date,
+      bankUpiId: d.bank_upi_id,
+      isActive: d.is_active,
+      totpSecret: d.totp_secret ?? null,
+      is2faEnabled: Boolean(d.is_2fa_enabled && d.totp_secret),
+    };
+  }
+
   // --- Employee & Auth ---
   async loginWithMobile(mobileNumber: string): Promise<{ success: boolean; user?: Employee; message: string }> {
     try {
@@ -35,22 +53,60 @@ export class SupabaseService {
         };
       }
 
-      const user: Employee = {
-        id: data.id,
-        fullName: data.full_name,
-        mobileNumber: data.mobile_number,
-        role: data.role,
-        designation: data.designation,
-        baseSalary: Number(data.base_salary),
-        salaryType: data.salary_type,
-        joiningDate: data.joining_date,
-        bankUpiId: data.bank_upi_id,
-        isActive: data.is_active,
-      };
-
-      return { success: true, user, message: 'Login successful' };
+      const user = this.mapEmployee(data);
+      return { success: true, user, message: 'Account verified' };
     } catch (err: any) {
       return { success: false, message: err.message || 'Supabase connection failed' };
+    }
+  }
+
+  async saveTotpSecret(employeeId: string, secret: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const { error } = await supabase
+        .from('employees')
+        .update({
+          totp_secret: secret,
+          is_2fa_enabled: true,
+        })
+        .eq('id', employeeId);
+
+      if (error) {
+        if (error.message?.includes('totp_secret') || error.message?.includes('is_2fa_enabled')) {
+          return {
+            success: false,
+            message:
+              'Database is missing 2FA columns. Please run supabase-2fa-migration.sql in your Supabase SQL Editor first.',
+          };
+        }
+        return { success: false, message: error.message || 'Failed to save Google Authenticator setup' };
+      }
+
+      return { success: true, message: 'Google Authenticator linked successfully!' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to save Authenticator setup' };
+    }
+  }
+
+  async resetTotp(employeeId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const { error } = await supabase
+        .from('employees')
+        .update({
+          totp_secret: null,
+          is_2fa_enabled: false,
+        })
+        .eq('id', employeeId);
+
+      if (error) {
+        return { success: false, message: error.message || 'Failed to reset Google Authenticator' };
+      }
+
+      return {
+        success: true,
+        message: 'Google Authenticator reset. The user will be prompted to set it up again on next login.',
+      };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to reset Authenticator' };
     }
   }
 
@@ -62,18 +118,7 @@ export class SupabaseService {
 
     if (error || !data) return [];
 
-    return data.map((d: any) => ({
-      id: d.id,
-      fullName: d.full_name,
-      mobileNumber: d.mobile_number,
-      role: d.role,
-      designation: d.designation,
-      baseSalary: Number(d.base_salary),
-      salaryType: d.salary_type,
-      joiningDate: d.joining_date,
-      bankUpiId: d.bank_upi_id,
-      isActive: d.is_active,
-    }));
+    return data.map((d: any) => this.mapEmployee(d));
   }
 
   async getEmployeeById(id: string): Promise<Employee | undefined> {
@@ -87,18 +132,7 @@ export class SupabaseService {
       .maybeSingle();
 
     if (error || !data) return undefined;
-    return {
-      id: data.id,
-      fullName: data.full_name,
-      mobileNumber: data.mobile_number,
-      role: data.role,
-      designation: data.designation,
-      baseSalary: Number(data.base_salary),
-      salaryType: data.salary_type,
-      joiningDate: data.joining_date,
-      bankUpiId: data.bank_upi_id,
-      isActive: data.is_active,
-    };
+    return this.mapEmployee(data);
   }
 
   async addEmployee(emp: Omit<Employee, 'id' | 'isActive'>): Promise<{ success: boolean; employee?: Employee; message: string }> {

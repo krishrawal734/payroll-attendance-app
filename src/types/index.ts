@@ -13,6 +13,8 @@ export interface Employee {
   joiningDate: string; // YYYY-MM-DD
   isActive: boolean;
   bankUpiId?: string;
+  totpSecret?: string | null;
+  is2faEnabled?: boolean;
 }
 
 export interface AttendanceLocation {

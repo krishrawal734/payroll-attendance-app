@@ -9,6 +9,8 @@ const USER_STORAGE_KEY = '@workpulse_auth_user';
 interface AuthContextType {
   user: Employee | null;
   isLoading: boolean;
+  lookupUserByMobile: (mobileNumber: string) => Promise<{ success: boolean; user?: Employee; message: string }>;
+  completeLogin: (authenticatedUser: Employee) => Promise<void>;
   login: (mobileNumber: string) => Promise<{ success: boolean; user?: Employee; message: string }>;
   logout: () => Promise<void>;
   refreshUserData: () => Promise<void>;
@@ -18,6 +20,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: false,
+  lookupUserByMobile: async () => ({ success: false, message: '' }),
+  completeLogin: async () => {},
   login: async () => ({ success: false, message: '' }),
   logout: async () => {},
   refreshUserData: async () => {},
@@ -53,17 +57,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     restoreSession();
   }, []);
 
+  /**
+   * Step 1 of Google Authenticator login:
+   * Verifies the mobile number exists and is active, WITHOUT signing the user in yet.
+   */
+  const lookupUserByMobile = async (mobileNumber: string) => {
+    return await dataService.loginWithMobile(mobileNumber);
+  };
+
+  /**
+   * Step 2 of Google Authenticator login:
+   * Called ONLY after the 6-digit Google Authenticator TOTP code is verified.
+   */
+  const completeLogin = async (authenticatedUser: Employee) => {
+    db.setCurrentUser(authenticatedUser);
+    setUser(authenticatedUser);
+    try {
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(authenticatedUser));
+    } catch (err) {
+      console.warn('Failed to persist user session:', err);
+    }
+  };
+
   const login = async (mobileNumber: string) => {
     setIsLoading(true);
     const res = await dataService.loginWithMobile(mobileNumber);
     if (res.success && res.user) {
-      db.setCurrentUser(res.user);
-      setUser(res.user);
-      try {
-        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(res.user));
-      } catch (err) {
-        console.warn('Failed to persist user session:', err);
-      }
+      await completeLogin(res.user);
     }
     setIsLoading(false);
     return res;
@@ -95,7 +115,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, refreshUserData, isCloudMode }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        lookupUserByMobile,
+        completeLogin,
+        login,
+        logout,
+        refreshUserData,
+        isCloudMode,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
