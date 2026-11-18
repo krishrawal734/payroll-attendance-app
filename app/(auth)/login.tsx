@@ -7,14 +7,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StyleSheet,
   ActivityIndicator,
   Linking,
   Share,
-  Animated,
-  StatusBar,
 } from 'react-native';
-import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/store/authContext';
 import { dataService } from '../../src/services/dataService';
@@ -31,75 +28,52 @@ import QrCodeSvg from '../../src/components/QrCodeSvg';
 import {
   ArrowRight,
   ArrowLeft,
+  Shield,
   ShieldCheck,
   KeyRound,
   ExternalLink,
   Copy,
+  UserCheck,
   AlertCircle,
+  Clock,
   CheckCircle2,
-  QrCode,
-  Smartphone,
-  Lock,
-  WifiOff,
   X,
-  RefreshCw,
 } from 'lucide-react-native';
 
 type AuthStep = 'mobile' | 'setup' | 'verify';
-type SetupTab = 'qr' | 'key';
+
+const CARD_ELEVATION = {
+  elevation: 5,
+  shadowColor: '#0f172a',
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.08,
+  shadowRadius: 16,
+};
+
+const BUTTON_ELEVATION = {
+  elevation: 3,
+  shadowColor: '#4f46e5',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.25,
+  shadowRadius: 10,
+};
 
 export default function LoginScreen() {
   const router = useRouter();
   const { lookupUserByMobile, completeLogin } = useAuth();
 
   const [step, setStep] = useState<AuthStep>('mobile');
-  const [setupTab, setSetupTab] = useState<SetupTab>('qr');
   const [mobileNumber, setMobileNumber] = useState('');
-  const [phoneFocused, setPhoneFocused] = useState(false);
+  const [isPhoneFocused, setIsPhoneFocused] = useState(false);
   const [pendingUser, setPendingUser] = useState<Employee | null>(null);
   const [setupSecret, setSetupSecret] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
-  const [verifiedSuccess, setVerifiedSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(getTotpRemainingSeconds());
 
   const otpInputRef = useRef<TextInput>(null);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-
-  // Smooth step transition animation
-  const animateStepTransition = (nextStep: AuthStep) => {
-    fadeAnim.setValue(0);
-    slideAnim.setValue(18);
-    setStep(nextStep);
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 240,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 240,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  // Subtle horizontal shake on invalid OTP
-  const triggerOtpShake = () => {
-    shakeAnim.setValue(0);
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: -8, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -6, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 6, duration: 45, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 40, useNativeDriver: true }),
-    ]).start();
-  };
 
   // Live 30-second countdown timer while on setup or verify step
   useEffect(() => {
@@ -112,14 +86,11 @@ export default function LoginScreen() {
   }, [step]);
 
   const navigateToRoleHome = (authenticatedUser: Employee) => {
-    setVerifiedSuccess(true);
-    setTimeout(() => {
-      if (authenticatedUser.role === 'admin') {
-        router.replace('/(admin)');
-      } else {
-        router.replace('/(employee)');
-      }
-    }, 450);
+    if (authenticatedUser.role === 'admin') {
+      router.replace('/(admin)');
+    } else {
+      router.replace('/(employee)');
+    }
   };
 
   const handleMobileContinue = async () => {
@@ -136,40 +107,38 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (!res.success || !res.user) {
-      setErrorMsg(res.message || 'Mobile number not found. Contact your Admin to register.');
+      setErrorMsg(res.message || 'Mobile number not registered. Contact your Admin.');
       return;
     }
 
     setPendingUser(res.user);
     setOtpCode('');
-    setVerifiedSuccess(false);
 
     if (res.user.is2faEnabled && res.user.totpSecret) {
-      animateStepTransition('verify');
-      setTimeout(() => otpInputRef.current?.focus(), 260);
+      setStep('verify');
+      setTimeout(() => otpInputRef.current?.focus(), 200);
     } else {
       const freshSecret = generateTotpSecret();
       setSetupSecret(freshSecret);
-      setSetupTab('qr');
-      animateStepTransition('setup');
+      setStep('setup');
     }
   };
 
   const handleVerifySetup = async (codeOverride?: string) => {
-    if (!pendingUser || !setupSecret || loading) return;
+    if (!pendingUser || !setupSecret) return;
     const code = (codeOverride ?? otpCode).trim();
     setErrorMsg(null);
 
     if (code.length !== 6) {
-      setErrorMsg('Enter the 6-digit code shown in Google Authenticator.');
-      triggerOtpShake();
+      setErrorMsg('Please enter the 6-digit code shown in Google Authenticator.');
       return;
     }
 
     const isValid = verifyTotpCode(setupSecret, code, 1);
     if (!isValid) {
-      setErrorMsg('Code did not match. Ensure WorkPulse is added in Google Authenticator and enter the latest 6 digits.');
-      triggerOtpShake();
+      setErrorMsg(
+        'Code did not match. Make sure you added WorkPulse in Google Authenticator and enter the latest 6-digit code.'
+      );
       return;
     }
 
@@ -193,20 +162,18 @@ export default function LoginScreen() {
   };
 
   const handleVerifyLogin = async (codeOverride?: string) => {
-    if (!pendingUser || !pendingUser.totpSecret || loading) return;
+    if (!pendingUser || !pendingUser.totpSecret) return;
     const code = (codeOverride ?? otpCode).trim();
     setErrorMsg(null);
 
     if (code.length !== 6) {
-      setErrorMsg('Enter the 6-digit code from Google Authenticator.');
-      triggerOtpShake();
+      setErrorMsg('Please enter the 6-digit code from Google Authenticator.');
       return;
     }
 
     const isValid = verifyTotpCode(pendingUser.totpSecret, code, 1);
     if (!isValid) {
-      setErrorMsg('Invalid authenticator code. Please check Google Authenticator and try again.');
-      triggerOtpShake();
+      setErrorMsg('Invalid Google Authenticator code. Please check the app and try again.');
       return;
     }
 
@@ -239,12 +206,25 @@ export default function LoginScreen() {
     const uri = buildTotpUri(setupSecret, accountLabel, 'WorkPulse');
 
     try {
-      await Linking.openURL(uri);
-      setInfoMsg('Opened Google Authenticator! Tap "Add", then return here and enter the 6-digit code.');
+      const supported = await Linking.canOpenURL(uri);
+      if (supported) {
+        await Linking.openURL(uri);
+        setInfoMsg(
+          'Opened Google Authenticator! Tap "Add" there, then return here and enter the 6-digit code.'
+        );
+      } else {
+        setErrorMsg(
+          'Google Authenticator app was not detected on this device. Install it from Play Store or enter the setup key manually.'
+        );
+      }
     } catch {
-      setErrorMsg(
-        'Could not launch Google Authenticator automatically. Install it from Play Store or copy the setup key manually.'
-      );
+      try {
+        await Linking.openURL(uri);
+      } catch {
+        setErrorMsg(
+          'Could not launch Google Authenticator automatically. Open Google Authenticator → Tap "+" → "Enter a setup key" and paste the key below.'
+        );
+      }
     }
   };
 
@@ -256,7 +236,7 @@ export default function LoginScreen() {
         title: 'WorkPulse Google Authenticator Setup Key',
       });
     } catch {
-      // dismissed
+      // User dismissed share sheet
     }
   };
 
@@ -269,13 +249,12 @@ export default function LoginScreen() {
   };
 
   const handleResetToMobile = () => {
+    setStep('mobile');
     setPendingUser(null);
     setSetupSecret('');
     setOtpCode('');
     setErrorMsg(null);
     setInfoMsg(null);
-    setVerifiedSuccess(false);
-    animateStepTransition('mobile');
   };
 
   const maskMobile = (num: string) => {
@@ -288,1334 +267,446 @@ export default function LoginScreen() {
       ? buildTotpUri(setupSecret, `${pendingUser.fullName} (${pendingUser.mobileNumber})`, 'WorkPulse')
       : '';
 
-  // Circular SVG 30s TOTP countdown ring
-  const renderCountdownRing = () => {
-    const ringSize = 26;
-    const strokeWidth = 2.8;
-    const radius = (ringSize - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference * (1 - secondsLeft / 30);
-    const isExpiring = secondsLeft <= 5;
-    const ringColor = isExpiring ? '#f59e0b' : '#4f46e5';
-
-    return (
-      <View style={styles.countdownRow}>
-        <View style={styles.ringWrap}>
-          <Svg width={ringSize} height={ringSize}>
-            <Circle
-              cx={ringSize / 2}
-              cy={ringSize / 2}
-              r={radius}
-              stroke="#e2e8f0"
-              strokeWidth={strokeWidth}
-              fill="none"
-            />
-            <Circle
-              cx={ringSize / 2}
-              cy={ringSize / 2}
-              r={radius}
-              stroke={ringColor}
-              strokeWidth={strokeWidth}
-              fill="none"
-              strokeDasharray={`${circumference} ${circumference}`}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              transform={`rotate(-90 ${ringSize / 2} ${ringSize / 2})`}
-            />
-          </Svg>
-          <Text style={[styles.ringSeconds, isExpiring && { color: '#d97706' }]}>
-            {secondsLeft}
-          </Text>
-        </View>
-        <Text style={[styles.countdownLabel, isExpiring && styles.countdownLabelWarn]}>
-          {isExpiring ? `Refreshing code in ${secondsLeft}s…` : `Code valid for ${secondsLeft}s`}
-        </Text>
-        {otpCode.length > 0 && !verifiedSuccess && (
-          <TouchableOpacity
-            onPress={() => {
-              setOtpCode('');
-              setErrorMsg(null);
-              otpInputRef.current?.focus();
-            }}
-            style={styles.clearOtpBtn}
-          >
-            <RefreshCw size={11} color="#64748b" />
-            <Text style={styles.clearOtpText}>Clear</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  };
-
-  // Split 3 + 3 OTP boxes matching Google Authenticator's "123 456" layout
   const renderOtpBoxes = () => {
     const digits = otpCode.split('');
-    const renderBox = (index: number) => {
-      const digit = digits[index] || '';
-      const isActive = index === otpCode.length || (otpCode.length === 6 && index === 5);
-      const isFilled = digit !== '';
-      return (
-        <View
-          key={index}
-          style={[
-            styles.otpBox,
-            isFilled && styles.otpBoxFilled,
-            isActive && !verifiedSuccess && styles.otpBoxActive,
-            errorMsg ? styles.otpBoxError : null,
-            verifiedSuccess ? styles.otpBoxSuccess : null,
-          ]}
-        >
-          <Text
-            style={[
-              styles.otpDigit,
-              isFilled && styles.otpDigitFilled,
-              verifiedSuccess && styles.otpDigitSuccess,
-            ]}
-          >
-            {digit || ''}
-          </Text>
-          {!isFilled && !isActive && <View style={styles.otpPlaceholderDot} />}
-          {!isFilled && isActive && !verifiedSuccess && <View style={styles.otpCursorBar} />}
-        </View>
-      );
-    };
-
     return (
-      <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
-        <TouchableOpacity
-          activeOpacity={1}
-          style={styles.otpContainer}
-          onPress={() => otpInputRef.current?.focus()}
-        >
-          <TextInput
-            ref={otpInputRef}
-            style={styles.hiddenOtpInput}
-            value={otpCode}
-            onChangeText={handleOtpChange}
-            keyboardType="number-pad"
-            maxLength={6}
-            autoComplete="one-time-code"
-            textContentType="oneTimeCode"
-            caretHidden
-          />
-          <View style={styles.otpGroup}>
-            {[0, 1, 2].map(renderBox)}
-          </View>
-          <View style={styles.otpDividerDash} />
-          <View style={styles.otpGroup}>
-            {[3, 4, 5].map(renderBox)}
-          </View>
-        </TouchableOpacity>
-      </Animated.View>
+      <TouchableOpacity
+        activeOpacity={1}
+        className="flex-row justify-between gap-2 mb-4 relative"
+        onPress={() => otpInputRef.current?.focus()}
+      >
+        <TextInput
+          ref={otpInputRef}
+          className="absolute inset-0 w-full h-full z-10"
+          style={{ opacity: 0.01 }}
+          value={otpCode}
+          onChangeText={handleOtpChange}
+          keyboardType="number-pad"
+          maxLength={6}
+          autoComplete="one-time-code"
+          textContentType="oneTimeCode"
+          caretHidden
+        />
+        {[0, 1, 2, 3, 4, 5].map((index) => {
+          const digit = digits[index] || '';
+          const isActive = index === otpCode.length || (otpCode.length === 6 && index === 5);
+          const isFilled = digit !== '';
+
+          const boxClasses = errorMsg
+            ? 'border-2 border-rose-400 bg-rose-50'
+            : isActive
+              ? 'border-2 border-indigo-600 bg-white'
+              : isFilled
+                ? 'border-2 border-indigo-400 bg-indigo-50'
+                : 'border border-slate-300 bg-slate-50';
+
+          return (
+            <View
+              key={index}
+              className={`flex-1 h-14 rounded-2xl items-center justify-center ${boxClasses}`}
+            >
+              <Text
+                className={`text-2xl font-extrabold ${
+                  errorMsg
+                    ? 'text-rose-700'
+                    : isFilled
+                      ? 'text-indigo-950'
+                      : 'text-slate-300'
+                }`}
+              >
+                {digit || '•'}
+              </Text>
+            </View>
+          );
+        })}
+      </TouchableOpacity>
     );
   };
 
-  const renderUserBanner = (isFirstLogin: boolean) => {
-    if (!pendingUser) return null;
-    const isAdmin = pendingUser.role === 'admin';
+  const renderCountdownBar = () => {
+    const progressPct = (secondsLeft / 30) * 100;
+    const isExpiring = secondsLeft <= 5;
     return (
-      <View style={styles.userCard}>
-        <View style={[styles.userAvatar, isAdmin && styles.userAvatarAdmin]}>
-          <Text style={[styles.userAvatarText, isAdmin && styles.userAvatarTextAdmin]}>
-            {pendingUser.fullName.slice(0, 2).toUpperCase()}
+      <View className="mb-5">
+        <View className="flex-row items-center justify-center gap-1.5 mb-2">
+          <Clock size={13} color={isExpiring ? '#d97706' : '#64748b'} />
+          <Text
+            className={`text-xs font-semibold ${
+              isExpiring ? 'text-amber-600 font-bold' : 'text-slate-500'
+            }`}
+          >
+            Authenticator code refreshes in {secondsLeft}s
           </Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={styles.userName} numberOfLines={1}>
-              {pendingUser.fullName}
-            </Text>
-          </View>
-          <View style={styles.userMetaRow}>
-            <Text style={styles.userMetaText}>
-              +91 {isFirstLogin ? pendingUser.mobileNumber : maskMobile(pendingUser.mobileNumber)}
-            </Text>
-            <View style={[styles.rolePill, isAdmin ? styles.rolePillAdmin : styles.rolePillEmp]}>
-              <Text style={[styles.rolePillText, isAdmin ? styles.rolePillTextAdmin : styles.rolePillTextEmp]}>
-                {isAdmin ? 'ADMIN' : 'EMPLOYEE'}
-              </Text>
-            </View>
-          </View>
+        <View className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+          <View
+            className={`h-full rounded-full ${isExpiring ? 'bg-amber-500' : 'bg-indigo-600'}`}
+            style={{ width: `${progressPct}%` }}
+          />
         </View>
-        <TouchableOpacity style={styles.switchBtn} onPress={handleResetToMobile}>
-          <Text style={styles.switchBtnText}>Switch</Text>
-        </TouchableOpacity>
       </View>
     );
   };
 
   return (
-    <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      className="flex-1 bg-slate-100"
+    >
+      <StatusBar style="light" />
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="pb-10"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
-          {/* PREMIUM DARK HERO HEADER */}
-          <View style={styles.heroBanner}>
-            {/* Subtle ambient glow behind logo */}
-            <Svg
-              width={280}
-              height={220}
-              viewBox="0 0 280 220"
-              style={styles.heroGlowSvg}
-              pointerEvents="none"
-            >
-              <Defs>
-                <RadialGradient id="heroGlow" cx="50%" cy="45%" r="50%">
-                  <Stop offset="0%" stopColor="#4f46e5" stopOpacity="0.45" />
-                  <Stop offset="60%" stopColor="#06b6d4" stopOpacity="0.12" />
-                  <Stop offset="100%" stopColor="#0f172a" stopOpacity="0" />
-                </RadialGradient>
-              </Defs>
-              <Circle cx="140" cy="100" r="110" fill="url(#heroGlow)" />
-            </Svg>
-
-            <View style={styles.logoGlassBadge}>
-              <WorkPulseLogo size={50} />
-            </View>
-
-            <View style={styles.brandTitleRow}>
-              <Text style={styles.brandWork}>Work</Text>
-              <Text style={styles.brandPulse}>Pulse</Text>
-            </View>
-            <Text style={styles.brandTagline}>
-              Smart Workforce Attendance & Payroll
-            </Text>
-
-            {/* 2-Step Progress Stepper */}
-            <View style={styles.stepperRow}>
-              <View style={styles.stepItem}>
-                <View style={[styles.stepDot, step === 'mobile' ? styles.stepDotActive : styles.stepDotDone]}>
-                  {step === 'mobile' ? (
-                    <Text style={styles.stepDotNum}>1</Text>
-                  ) : (
-                    <CheckCircle2 size={12} color="#ffffff" />
-                  )}
-                </View>
-                <Text style={[styles.stepLabel, step === 'mobile' && styles.stepLabelActive]}>
-                  Mobile ID
-                </Text>
-              </View>
-
-              <View style={[styles.stepConnector, step !== 'mobile' && styles.stepConnectorActive]} />
-
-              <View style={styles.stepItem}>
-                <View
-                  style={[
-                    styles.stepDot,
-                    step !== 'mobile' ? styles.stepDotActive : styles.stepDotIdle,
-                    verifiedSuccess && styles.stepDotDone,
-                  ]}
-                >
-                  {verifiedSuccess ? (
-                    <CheckCircle2 size={12} color="#ffffff" />
-                  ) : (
-                    <Text style={[styles.stepDotNum, step === 'mobile' && styles.stepDotNumIdle]}>
-                      2
-                    </Text>
-                  )}
-                </View>
-                <Text style={[styles.stepLabel, step !== 'mobile' && styles.stepLabelActive]}>
-                  {step === 'setup' ? 'Link 2FA' : 'Authenticator'}
-                </Text>
-              </View>
-            </View>
+        {/* Top Hero */}
+        <View className="bg-indigo-950 pt-14 pb-16 px-6 rounded-b-[36px] items-center">
+          <View className="w-20 h-20 rounded-3xl bg-indigo-900 border border-indigo-700 items-center justify-center mb-3.5">
+            <WorkPulseLogo size={54} />
           </View>
+          <Text className="text-3xl font-extrabold text-white tracking-tight">WorkPulse</Text>
+          <Text className="text-sm text-indigo-200 mt-1 text-center">
+            Employee Attendance & Payroll Platform
+          </Text>
+          <View className="flex-row items-center gap-1.5 mt-3.5 px-3.5 py-1.5 rounded-full bg-indigo-900 border border-indigo-700">
+            <ShieldCheck size={13} color="#34d399" />
+            <Text className="text-xs font-bold text-indigo-100">Google Authenticator Login</Text>
+          </View>
+        </View>
 
-          {/* FLOATING CONTENT SHEET */}
-          <Animated.View
-            style={[
-              styles.contentWrapper,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            {/* STEP 1: MOBILE NUMBER */}
-            {step === 'mobile' && (
-              <>
-                <View style={styles.mainCard}>
-                  <View style={styles.cardHeaderRow}>
-                    <View>
-                      <Text style={styles.cardTitle}>Welcome Back</Text>
-                      <Text style={styles.cardSubtitle}>
-                        Sign in with your registered mobile & Google Authenticator
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.inputLabelRow}>
-                    <Text style={styles.inputLabel}>REGISTERED MOBILE NUMBER</Text>
-                    <Text
-                      style={[
-                        styles.digitCounter,
-                        mobileNumber.length === 10 && styles.digitCounterComplete,
-                      ]}
-                    >
-                      {mobileNumber.length}/10
-                    </Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.phoneInputBox,
-                      phoneFocused && styles.phoneInputBoxFocused,
-                      errorMsg ? styles.phoneInputBoxError : null,
-                    ]}
-                  >
-                    <View style={styles.countryCodeChip}>
-                      <Text style={styles.countryFlag}>🇮🇳</Text>
-                      <Text style={styles.countryCodeText}>+91</Text>
-                    </View>
-                    <TextInput
-                      style={styles.phoneInput}
-                      placeholder="98765 43210"
-                      placeholderTextColor="#94a3b8"
-                      keyboardType="phone-pad"
-                      maxLength={10}
-                      value={mobileNumber}
-                      onFocus={() => setPhoneFocused(true)}
-                      onBlur={() => setPhoneFocused(false)}
-                      onChangeText={(val) => {
-                        setMobileNumber(val.replace(/\D/g, ''));
-                        if (errorMsg) setErrorMsg(null);
-                      }}
-                      onSubmitEditing={handleMobileContinue}
-                      returnKeyType="done"
-                    />
-                    {mobileNumber.length > 0 && (
-                      <TouchableOpacity
-                        style={styles.clearInputBtn}
-                        onPress={() => {
-                          setMobileNumber('');
-                          setErrorMsg(null);
-                        }}
-                      >
-                        <X size={14} color="#64748b" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {errorMsg && (
-                    <View style={styles.errorBanner}>
-                      <AlertCircle size={16} color="#dc2626" />
-                      <Text style={styles.errorBannerText}>{errorMsg}</Text>
-                    </View>
-                  )}
-
-                  <TouchableOpacity
-                    style={[
-                      styles.primaryBtn,
-                      (loading || mobileNumber.length < 10) && styles.btnMuted,
-                    ]}
-                    activeOpacity={0.88}
-                    disabled={loading}
-                    onPress={handleMobileContinue}
-                  >
-                    {loading ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                      <>
-                        <Text style={styles.primaryBtnText}>Continue with Authenticator</Text>
-                        <View style={styles.btnArrowCircle}>
-                          <ArrowRight size={15} color="#4f46e5" />
-                        </View>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                {/* Feature Trust Strip */}
-                <View style={styles.trustGrid}>
-                  <View style={styles.trustChip}>
-                    <View style={[styles.trustIconBox, { backgroundColor: '#eef2ff' }]}>
-                      <ShieldCheck size={15} color="#4f46e5" />
-                    </View>
-                    <Text style={styles.trustTitle}>2FA Verified</Text>
-                    <Text style={styles.trustSub}>Google Auth</Text>
-                  </View>
-
-                  <View style={styles.trustChip}>
-                    <View style={[styles.trustIconBox, { backgroundColor: '#ecfeff' }]}>
-                      <WifiOff size={15} color="#0891b2" />
-                    </View>
-                    <Text style={styles.trustTitle}>Offline Codes</Text>
-                    <Text style={styles.trustSub}>No SMS wait</Text>
-                  </View>
-
-                  <View style={styles.trustChip}>
-                    <View style={[styles.trustIconBox, { backgroundColor: '#ecfdf5' }]}>
-                      <Lock size={15} color="#059669" />
-                    </View>
-                    <Text style={styles.trustTitle}>Role Locked</Text>
-                    <Text style={styles.trustSub}>Admin & Staff</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.footerHelpText}>
-                  New employee? Ask your Company Administrator to register your mobile number.
-                </Text>
-              </>
-            )}
-
-            {/* STEP 2A: FIRST-TIME GOOGLE AUTHENTICATOR SETUP */}
-            {step === 'setup' && pendingUser && (
-              <View style={styles.mainCard}>
-                {renderUserBanner(true)}
-
-                {/* STEP 1 BLOCK */}
-                <View style={styles.setupStepHeader}>
-                  <View style={styles.stepPill}>
-                    <Text style={styles.stepPillText}>STEP 1</Text>
-                  </View>
-                  <Text style={styles.setupStepTitle}>Link Google Authenticator</Text>
-                </View>
-                <Text style={styles.setupStepDesc}>
-                  Tap below to add WorkPulse directly to Google Authenticator on this phone.
+        {/* Main Floating Card Area */}
+        <View className="-mt-9 mx-5">
+          {/* STEP 1: MOBILE NUMBER */}
+          {step === 'mobile' && (
+            <>
+              <View
+                className="bg-white rounded-3xl p-6 border border-slate-200 mb-5"
+                style={CARD_ELEVATION}
+              >
+                <Text className="text-xl font-extrabold text-slate-900">Sign In</Text>
+                <Text className="text-xs text-slate-500 mt-1.5 mb-5 leading-5">
+                  Enter your 10-digit registered mobile number, then verify with your 6-digit Google Authenticator code.
                 </Text>
 
-                <TouchableOpacity
-                  style={styles.darkActionBtn}
-                  activeOpacity={0.88}
-                  onPress={handleOpenAuthenticatorApp}
+                <View
+                  className={`flex-row items-center rounded-2xl overflow-hidden mb-4 ${
+                    errorMsg
+                      ? 'border-2 border-rose-400 bg-rose-50'
+                      : isPhoneFocused
+                        ? 'border-2 border-indigo-600 bg-white'
+                        : 'border border-slate-300 bg-slate-50'
+                  }`}
                 >
-                  <Smartphone size={17} color="#38bdf8" />
-                  <Text style={styles.darkActionBtnText}>Open in Google Authenticator</Text>
-                  <ExternalLink size={14} color="#94a3b8" />
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.storeLinkRow} onPress={handleInstallAuthenticator}>
-                  <Text style={styles.storeLinkText}>
-                    Need the app? Download Google Authenticator →
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Segmented Toggle: QR Code vs Manual Key */}
-                <View style={styles.segmentContainer}>
-                  <TouchableOpacity
-                    style={[styles.segmentTab, setupTab === 'qr' && styles.segmentTabActive]}
-                    onPress={() => setSetupTab('qr')}
-                  >
-                    <QrCode size={14} color={setupTab === 'qr' ? '#4f46e5' : '#64748b'} />
-                    <Text style={[styles.segmentText, setupTab === 'qr' && styles.segmentTextActive]}>
-                      QR Code
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.segmentTab, setupTab === 'key' && styles.segmentTabActive]}
-                    onPress={() => setSetupTab('key')}
-                  >
-                    <KeyRound size={14} color={setupTab === 'key' ? '#4f46e5' : '#64748b'} />
-                    <Text style={[styles.segmentText, setupTab === 'key' && styles.segmentTextActive]}>
-                      Manual Key
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {setupTab === 'qr' ? (
-                  <View style={styles.qrCard}>
-                    <QrCodeSvg value={totpUri} size={156} />
-                    <Text style={styles.qrHint}>
-                      Scan with Google Authenticator from another phone
-                    </Text>
+                  <View className="px-4 py-4 bg-slate-100 border-r border-slate-200">
+                    <Text className="text-base font-extrabold text-slate-700">+91</Text>
                   </View>
-                ) : (
-                  <View style={styles.keyCard}>
-                    <Text style={styles.keyCardLabel}>TIME-BASED SECRET KEY</Text>
-                    <Text style={styles.keyCardValue} selectable>
-                      {formatSecretKey(setupSecret)}
-                    </Text>
-                    <TouchableOpacity style={styles.copyPillBtn} onPress={handleShareSecretKey}>
-                      <Copy size={13} color="#4f46e5" />
-                      <Text style={styles.copyPillText}>Share / Copy Setup Key</Text>
+                  <TextInput
+                    className="flex-1 px-4 py-4 text-base font-bold text-slate-900 tracking-wider"
+                    placeholder="Enter 10-digit number"
+                    placeholderTextColor="#94a3b8"
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    value={mobileNumber}
+                    onFocus={() => setIsPhoneFocused(true)}
+                    onBlur={() => setIsPhoneFocused(false)}
+                    onChangeText={(val) => {
+                      setMobileNumber(val.replace(/\D/g, ''));
+                      if (errorMsg) setErrorMsg(null);
+                    }}
+                    onSubmitEditing={handleMobileContinue}
+                    returnKeyType="done"
+                  />
+                  {mobileNumber.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setMobileNumber('');
+                        setErrorMsg(null);
+                      }}
+                      className="pr-3.5 pl-2 py-3"
+                    >
+                      <View className="w-6 h-6 rounded-full bg-slate-200 items-center justify-center">
+                        <X size={13} color="#475569" />
+                      </View>
                     </TouchableOpacity>
-                  </View>
-                )}
-
-                {infoMsg && (
-                  <View style={styles.infoBanner}>
-                    <CheckCircle2 size={16} color="#059669" />
-                    <Text style={styles.infoBannerText}>{infoMsg}</Text>
-                  </View>
-                )}
-
-                <View style={styles.sectionDivider} />
-
-                {/* STEP 2 BLOCK */}
-                <View style={styles.setupStepHeader}>
-                  <View style={[styles.stepPill, { backgroundColor: '#ecfdf5' }]}>
-                    <Text style={[styles.stepPillText, { color: '#059669' }]}>STEP 2</Text>
-                  </View>
-                  <Text style={styles.setupStepTitle}>Enter 6-Digit Code</Text>
+                  )}
                 </View>
-                <Text style={styles.setupStepDesc}>
-                  Enter the live 6-digit code shown under WorkPulse to finish linking.
-                </Text>
-
-                {renderOtpBoxes()}
-                {renderCountdownRing()}
 
                 {errorMsg && (
-                  <View style={styles.errorBanner}>
-                    <AlertCircle size={16} color="#dc2626" />
-                    <Text style={styles.errorBannerText}>{errorMsg}</Text>
+                  <View className="flex-row items-start gap-2.5 bg-rose-50 border border-rose-200 rounded-2xl p-3.5 mb-4">
+                    <AlertCircle size={16} color="#dc2626" style={{ marginTop: 1 }} />
+                    <Text className="flex-1 text-xs font-semibold text-rose-700 leading-5">
+                      {errorMsg}
+                    </Text>
                   </View>
                 )}
 
                 <TouchableOpacity
-                  style={[
-                    styles.primaryBtn,
-                    verifiedSuccess && styles.successBtn,
-                    (loading || otpCode.length < 6) && !verifiedSuccess && styles.btnMuted,
-                  ]}
-                  activeOpacity={0.88}
-                  disabled={loading || otpCode.length < 6 || verifiedSuccess}
-                  onPress={() => handleVerifySetup()}
+                  className={`bg-indigo-600 rounded-2xl py-4 flex-row items-center justify-center gap-2 ${
+                    loading ? 'opacity-60' : 'opacity-100'
+                  }`}
+                  style={BUTTON_ELEVATION}
+                  activeOpacity={0.85}
+                  disabled={loading}
+                  onPress={handleMobileContinue}
                 >
                   {loading ? (
                     <ActivityIndicator size="small" color="#ffffff" />
-                  ) : verifiedSuccess ? (
-                    <>
-                      <CheckCircle2 size={18} color="#ffffff" />
-                      <Text style={styles.primaryBtnText}>Authenticator Linked!</Text>
-                    </>
                   ) : (
                     <>
-                      <ShieldCheck size={18} color="#ffffff" />
-                      <Text style={styles.primaryBtnText}>Verify & Activate Account</Text>
+                      <Text className="text-white text-base font-bold">
+                        Continue to Authenticator
+                      </Text>
+                      <ArrowRight size={18} color="#ffffff" />
                     </>
                   )}
                 </TouchableOpacity>
               </View>
-            )}
 
-            {/* STEP 2B: RETURNING USER 6-DIGIT VERIFICATION */}
-            {step === 'verify' && pendingUser && (
-              <>
-                <View style={styles.mainCard}>
-                  {renderUserBanner(false)}
-
-                  <View style={styles.verifyHeroIcon}>
-                    {verifiedSuccess ? (
-                      <CheckCircle2 size={28} color="#059669" />
-                    ) : (
-                      <KeyRound size={26} color="#4f46e5" />
-                    )}
-                  </View>
-
-                  <Text style={[styles.cardTitle, { textAlign: 'center' }]}>
-                    {verifiedSuccess ? 'Verified!' : 'Authenticator Verification'}
+              {/* Info Card */}
+              <View className="bg-white rounded-2xl p-4 border border-slate-200">
+                <View className="flex-row items-center gap-1.5 mb-1.5">
+                  <Shield size={15} color="#4f46e5" />
+                  <Text className="text-[11px] font-extrabold text-slate-800 tracking-wider">
+                    GOOGLE AUTHENTICATOR PROTECTED
                   </Text>
-                  <Text style={[styles.cardSubtitle, { textAlign: 'center', marginBottom: 22 }]}>
-                    {verifiedSuccess
-                      ? 'Signing you into WorkPulse…'
-                      : 'Open Google Authenticator and enter the 6-digit code for WorkPulse'}
+                </View>
+                <Text className="text-xs text-slate-600 leading-5">
+                  WorkPulse uses time-based 6-digit codes from Google Authenticator instead of SMS OTPs. It works 100% offline and protects both Admin and Employee accounts.
+                </Text>
+                <View className="mt-3 pt-3 border-t border-slate-100 flex-row items-center gap-2">
+                  <UserCheck size={14} color="#64748b" />
+                  <Text className="flex-1 text-[11px] font-semibold text-slate-500">
+                    First time logging in? You will link Google Authenticator in one tap.
                   </Text>
+                </View>
+              </View>
+            </>
+          )}
 
-                  {renderOtpBoxes()}
-                  {renderCountdownRing()}
+          {/* STEP 2A: FIRST-TIME GOOGLE AUTHENTICATOR SETUP */}
+          {step === 'setup' && pendingUser && (
+            <View
+              className="bg-white rounded-3xl p-6 border border-slate-200"
+              style={CARD_ELEVATION}
+            >
+              <TouchableOpacity
+                className="flex-row items-center gap-1.5 mb-4 py-1 self-start"
+                onPress={handleResetToMobile}
+              >
+                <ArrowLeft size={16} color="#4f46e5" />
+                <Text className="text-xs font-bold text-indigo-600">Change Mobile Number</Text>
+              </TouchableOpacity>
 
-                  {errorMsg && (
-                    <View style={styles.errorBanner}>
-                      <AlertCircle size={16} color="#dc2626" />
-                      <Text style={styles.errorBannerText}>{errorMsg}</Text>
-                    </View>
-                  )}
+              {/* User Pill */}
+              <View className="flex-row items-center bg-slate-50 rounded-2xl p-3.5 border border-slate-200 mb-5 gap-3">
+                <View className="w-11 h-11 rounded-2xl bg-indigo-600 items-center justify-center">
+                  <Text className="text-sm font-extrabold text-white">
+                    {pendingUser.fullName.slice(0, 2).toUpperCase()}
+                  </Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-extrabold text-slate-900" numberOfLines={1}>
+                    {pendingUser.fullName}
+                  </Text>
+                  <Text className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                    +91 {pendingUser.mobileNumber} • {pendingUser.role.toUpperCase()}
+                  </Text>
+                </View>
+                <View className="px-2.5 py-1 rounded-full bg-amber-100 border border-amber-200">
+                  <Text className="text-[10px] font-extrabold text-amber-800">1st Login</Text>
+                </View>
+              </View>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.primaryBtn,
-                      verifiedSuccess && styles.successBtn,
-                      (loading || otpCode.length < 6) && !verifiedSuccess && styles.btnMuted,
-                    ]}
-                    activeOpacity={0.88}
-                    disabled={loading || otpCode.length < 6 || verifiedSuccess}
-                    onPress={() => handleVerifyLogin()}
+              <Text className="text-xl font-extrabold text-slate-900">
+                Link Google Authenticator
+              </Text>
+              <Text className="text-xs text-slate-500 mt-1.5 mb-5 leading-5">
+                One-time setup: add WorkPulse to your Google Authenticator app, then enter the 6-digit code below.
+              </Text>
+
+              {/* Step 1: One-tap open */}
+              <TouchableOpacity
+                className="bg-slate-900 rounded-2xl py-4 flex-row items-center justify-center gap-2 mb-2.5"
+                activeOpacity={0.85}
+                onPress={handleOpenAuthenticatorApp}
+              >
+                <ExternalLink size={17} color="#ffffff" />
+                <Text className="text-white text-sm font-bold">Add to Google Authenticator</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className="items-center py-1 mb-5"
+                onPress={handleInstallAuthenticator}
+              >
+                <Text className="text-xs font-semibold text-indigo-600">
+                  Don't have Google Authenticator? Install from Play Store →
+                </Text>
+              </TouchableOpacity>
+
+              {/* QR Code + Manual Key */}
+              <View className="items-center bg-slate-50 rounded-2xl p-4 border border-slate-200 mb-5">
+                <Text className="text-[10px] font-extrabold text-slate-500 tracking-wider mb-3">
+                  OR SCAN QR CODE / COPY SETUP KEY
+                </Text>
+                <QrCodeSvg value={totpUri} size={164} />
+
+                <View className="w-full mt-4 bg-white rounded-xl p-3 border border-slate-200 items-center">
+                  <Text className="text-[11px] font-semibold text-slate-500 mb-1.5">
+                    Manual Setup Key (Time-based)
+                  </Text>
+                  <Text
+                    className="text-xs font-extrabold text-slate-900 text-center tracking-widest"
+                    style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}
+                    selectable
                   >
-                    {loading ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
-                    ) : verifiedSuccess ? (
-                      <>
-                        <CheckCircle2 size={18} color="#ffffff" />
-                        <Text style={styles.primaryBtnText}>Access Granted</Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.primaryBtnText}>Verify & Sign In</Text>
-                        <View style={styles.btnArrowCircle}>
-                          <ArrowRight size={15} color="#4f46e5" />
-                        </View>
-                      </>
-                    )}
+                    {formatSecretKey(setupSecret)}
+                  </Text>
+                  <TouchableOpacity
+                    className="flex-row items-center gap-1.5 mt-2.5 px-3.5 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200"
+                    onPress={handleShareSecretKey}
+                  >
+                    <Copy size={13} color="#4f46e5" />
+                    <Text className="text-xs font-bold text-indigo-700">Share / Copy Key</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
 
-                <TouchableOpacity style={styles.backLinkBottom} onPress={handleResetToMobile}>
-                  <ArrowLeft size={14} color="#4f46e5" />
-                  <Text style={styles.backLinkBottomText}>Use a different mobile number</Text>
-                </TouchableOpacity>
+              {infoMsg && (
+                <View className="flex-row items-start gap-2.5 bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 mb-4">
+                  <CheckCircle2 size={16} color="#059669" style={{ marginTop: 1 }} />
+                  <Text className="flex-1 text-xs font-semibold text-emerald-800 leading-5">
+                    {infoMsg}
+                  </Text>
+                </View>
+              )}
 
-                <Text style={styles.footerHelpText}>
-                  Lost your phone or reinstalled Google Authenticator? Ask your Company Admin to reset your 2FA from the Admin Panel.
+              {/* Step 2: Enter 6-digit code */}
+              <Text className="text-xs font-bold text-slate-700 mb-3 text-center">
+                Enter the 6-digit code shown in Google Authenticator
+              </Text>
+
+              {renderOtpBoxes()}
+              {renderCountdownBar()}
+
+              {errorMsg && (
+                <View className="flex-row items-start gap-2.5 bg-rose-50 border border-rose-200 rounded-2xl p-3.5 mb-4">
+                  <AlertCircle size={16} color="#dc2626" style={{ marginTop: 1 }} />
+                  <Text className="flex-1 text-xs font-semibold text-rose-700 leading-5">
+                    {errorMsg}
+                  </Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                className={`bg-indigo-600 rounded-2xl py-4 flex-row items-center justify-center gap-2 ${
+                  loading || otpCode.length < 6 ? 'opacity-55' : 'opacity-100'
+                }`}
+                style={BUTTON_ELEVATION}
+                activeOpacity={0.85}
+                disabled={loading || otpCode.length < 6}
+                onPress={() => handleVerifySetup()}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <ShieldCheck size={18} color="#ffffff" />
+                    <Text className="text-white text-base font-bold">
+                      Verify & Activate Login
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* STEP 2B: RETURNING USER 6-DIGIT CODE VERIFICATION */}
+          {step === 'verify' && pendingUser && (
+            <View
+              className="bg-white rounded-3xl p-6 border border-slate-200"
+              style={CARD_ELEVATION}
+            >
+              <TouchableOpacity
+                className="flex-row items-center gap-1.5 mb-4 py-1 self-start"
+                onPress={handleResetToMobile}
+              >
+                <ArrowLeft size={16} color="#4f46e5" />
+                <Text className="text-xs font-bold text-indigo-600">Change Mobile Number</Text>
+              </TouchableOpacity>
+
+              {/* User Pill */}
+              <View className="flex-row items-center bg-slate-50 rounded-2xl p-3.5 border border-slate-200 mb-6 gap-3">
+                <View className="w-11 h-11 rounded-2xl bg-indigo-600 items-center justify-center">
+                  <Text className="text-sm font-extrabold text-white">
+                    {pendingUser.fullName.slice(0, 2).toUpperCase()}
+                  </Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-extrabold text-slate-900" numberOfLines={1}>
+                    {pendingUser.fullName}
+                  </Text>
+                  <Text className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                    +91 {maskMobile(pendingUser.mobileNumber)} • {pendingUser.role.toUpperCase()}
+                  </Text>
+                </View>
+                <View className="flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200">
+                  <ShieldCheck size={12} color="#059669" />
+                  <Text className="text-[10px] font-extrabold text-emerald-700">2FA Active</Text>
+                </View>
+              </View>
+
+              <View className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 items-center justify-center self-center mb-3">
+                <KeyRound size={24} color="#4f46e5" />
+              </View>
+
+              <Text className="text-xl font-extrabold text-slate-900 text-center">
+                Enter Authenticator Code
+              </Text>
+              <Text className="text-xs text-slate-500 text-center mt-1.5 mb-5 leading-5">
+                Open Google Authenticator on your phone and enter the 6-digit code for WorkPulse.
+              </Text>
+
+              {renderOtpBoxes()}
+              {renderCountdownBar()}
+
+              {errorMsg && (
+                <View className="flex-row items-start gap-2.5 bg-rose-50 border border-rose-200 rounded-2xl p-3.5 mb-4">
+                  <AlertCircle size={16} color="#dc2626" style={{ marginTop: 1 }} />
+                  <Text className="flex-1 text-xs font-semibold text-rose-700 leading-5">
+                    {errorMsg}
+                  </Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                className={`bg-indigo-600 rounded-2xl py-4 flex-row items-center justify-center gap-2 ${
+                  loading || otpCode.length < 6 ? 'opacity-55' : 'opacity-100'
+                }`}
+                style={BUTTON_ELEVATION}
+                activeOpacity={0.85}
+                disabled={loading || otpCode.length < 6}
+                onPress={() => handleVerifyLogin()}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <Text className="text-white text-base font-bold">Verify & Sign In</Text>
+                    <ArrowRight size={18} color="#ffffff" />
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <View className="mt-4 pt-3.5 border-t border-slate-100">
+                <Text className="text-[11px] text-slate-500 text-center leading-4">
+                  Lost access to Google Authenticator? Contact your Company Admin to reset your 2FA.
                 </Text>
-              </>
-            )}
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+              </View>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 36,
-  },
-
-  // --- HERO BANNER ---
-  heroBanner: {
-    backgroundColor: '#0f172a',
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
-    paddingBottom: 52,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    borderBottomLeftRadius: 34,
-    borderBottomRightRadius: 34,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  heroGlowSvg: {
-    position: 'absolute',
-    top: -10,
-    alignSelf: 'center',
-  },
-  logoGlassBadge: {
-    width: 76,
-    height: 76,
-    borderRadius: 24,
-    backgroundColor: 'rgba(79, 70, 229, 0.16)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(129, 140, 248, 0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  brandTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  brandWork: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#ffffff',
-    letterSpacing: -0.6,
-  },
-  brandPulse: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#38bdf8',
-    letterSpacing: -0.6,
-  },
-  brandTagline: {
-    fontSize: 12.5,
-    color: '#94a3b8',
-    fontWeight: '500',
-    marginTop: 4,
-  },
-
-  // --- STEPPER ---
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  stepDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepDotActive: {
-    backgroundColor: '#4f46e5',
-  },
-  stepDotDone: {
-    backgroundColor: '#10b981',
-  },
-  stepDotIdle: {
-    backgroundColor: 'rgba(148,163,184,0.22)',
-  },
-  stepDotNum: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  stepDotNumIdle: {
-    color: '#94a3b8',
-  },
-  stepLabel: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#94a3b8',
-  },
-  stepLabelActive: {
-    color: '#f8fafc',
-    fontWeight: '700',
-  },
-  stepConnector: {
-    width: 26,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: 'rgba(148,163,184,0.25)',
-    marginHorizontal: 10,
-  },
-  stepConnectorActive: {
-    backgroundColor: '#10b981',
-  },
-
-  // --- FLOATING SHEET ---
-  contentWrapper: {
-    paddingHorizontal: 18,
-    marginTop: -28,
-  },
-  mainCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 26,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    elevation: 4,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-  },
-  cardHeaderRow: {
-    marginBottom: 18,
-  },
-  cardTitle: {
-    fontSize: 21,
-    fontWeight: '800',
-    color: '#0f172a',
-    letterSpacing: -0.3,
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 5,
-    lineHeight: 19,
-  },
-
-  // --- PHONE INPUT ---
-  inputLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  inputLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#475569',
-    letterSpacing: 0.6,
-  },
-  digitCounter: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94a3b8',
-  },
-  digitCounterComplete: {
-    color: '#059669',
-  },
-  phoneInputBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#cbd5e1',
-    borderRadius: 16,
-    backgroundColor: '#f8fafc',
-    marginBottom: 18,
-    paddingRight: 10,
-  },
-  phoneInputBoxFocused: {
-    borderColor: '#4f46e5',
-    backgroundColor: '#ffffff',
-  },
-  phoneInputBoxError: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
-  countryCodeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 16,
-    borderRightWidth: 1,
-    borderRightColor: '#e2e8f0',
-    backgroundColor: '#f1f5f9',
-    borderTopLeftRadius: 14,
-    borderBottomLeftRadius: 14,
-  },
-  countryFlag: {
-    fontSize: 15,
-  },
-  countryCodeText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#1e293b',
-  },
-  phoneInput: {
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#0f172a',
-    letterSpacing: 1.5,
-  },
-  clearInputBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // --- PRIMARY CTA ---
-  primaryBtn: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    elevation: 3,
-    shadowColor: '#4f46e5',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
-    shadowRadius: 12,
-  },
-  successBtn: {
-    backgroundColor: '#059669',
-    shadowColor: '#059669',
-  },
-  btnMuted: {
-    opacity: 0.55,
-    elevation: 0,
-  },
-  primaryBtnText: {
-    color: '#ffffff',
-    fontSize: 15.5,
-    fontWeight: '800',
-    letterSpacing: 0.1,
-  },
-  btnArrowCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // --- TRUST GRID ---
-  trustGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 16,
-  },
-  trustChip: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    paddingVertical: 13,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  trustIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 7,
-  },
-  trustTitle: {
-    fontSize: 11.5,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  trustSub: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#64748b',
-    marginTop: 2,
-  },
-
-  // --- USER IDENTITY BANNER ---
-  userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginBottom: 20,
-    gap: 11,
-  },
-  userAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  userAvatarAdmin: {
-    backgroundColor: '#eef2ff',
-    borderColor: '#c7d2fe',
-  },
-  userAvatarText: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#047857',
-  },
-  userAvatarTextAdmin: {
-    color: '#4338ca',
-  },
-  userName: {
-    fontSize: 14.5,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  userMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 3,
-  },
-  userMetaText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  rolePill: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  rolePillAdmin: {
-    backgroundColor: '#eef2ff',
-  },
-  rolePillEmp: {
-    backgroundColor: '#ecfdf5',
-  },
-  rolePillText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  rolePillTextAdmin: {
-    color: '#4338ca',
-  },
-  rolePillTextEmp: {
-    color: '#047857',
-  },
-  switchBtn: {
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-  },
-  switchBtnText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#334155',
-  },
-
-  // --- SETUP SCREEN ---
-  setupStepHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  stepPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: '#eef2ff',
-  },
-  stepPillText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#4338ca',
-    letterSpacing: 0.6,
-  },
-  setupStepTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  setupStepDesc: {
-    fontSize: 12.5,
-    color: '#64748b',
-    lineHeight: 18,
-    marginBottom: 14,
-  },
-  darkActionBtn: {
-    backgroundColor: '#0f172a',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 9,
-  },
-  darkActionBtnText: {
-    color: '#ffffff',
-    fontSize: 14.5,
-    fontWeight: '700',
-  },
-  storeLinkRow: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  storeLinkText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4f46e5',
-  },
-
-  // --- SEGMENTED TOGGLE ---
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    padding: 4,
-    marginTop: 2,
-    marginBottom: 12,
-  },
-  segmentTab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    borderRadius: 9,
-  },
-  segmentTabActive: {
-    backgroundColor: '#ffffff',
-    elevation: 1,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-  },
-  segmentText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-  segmentTextActive: {
-    color: '#4f46e5',
-  },
-  qrCard: {
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  qrHint: {
-    fontSize: 11.5,
-    color: '#64748b',
-    fontWeight: '500',
-    marginTop: 10,
-    textAlign: 'center',
-  },
-  keyCard: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 18,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    alignItems: 'center',
-  },
-  keyCardLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#64748b',
-    letterSpacing: 0.8,
-    marginBottom: 10,
-  },
-  keyCardValue: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0f172a',
-    letterSpacing: 1.5,
-    textAlign: 'center',
-    lineHeight: 24,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  copyPillBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: '#eef2ff',
-    borderWidth: 1,
-    borderColor: '#c7d2fe',
-  },
-  copyPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#4f46e5',
-  },
-  sectionDivider: {
-    height: 1,
-    backgroundColor: '#e2e8f0',
-    marginVertical: 20,
-  },
-
-  // --- VERIFY ICON ---
-  verifyHeroIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
-    backgroundColor: '#eef2ff',
-    borderWidth: 1.5,
-    borderColor: '#c7d2fe',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: 14,
-  },
-
-  // --- SPLIT 3+3 OTP BOXES ---
-  otpContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    position: 'relative',
-  },
-  hiddenOtpInput: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    opacity: 0.01,
-    zIndex: 2,
-  },
-  otpGroup: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 6,
-  },
-  otpDividerDash: {
-    width: 10,
-    height: 2.5,
-    borderRadius: 2,
-    backgroundColor: '#cbd5e1',
-    marginHorizontal: 7,
-  },
-  otpBox: {
-    flex: 1,
-    height: 54,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#f8fafc',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  otpBoxFilled: {
-    borderColor: '#6366f1',
-    backgroundColor: '#eef2ff',
-  },
-  otpBoxActive: {
-    borderColor: '#4f46e5',
-    borderWidth: 2,
-    backgroundColor: '#ffffff',
-  },
-  otpBoxError: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
-  otpBoxSuccess: {
-    borderColor: '#10b981',
-    backgroundColor: '#ecfdf5',
-  },
-  otpDigit: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#94a3b8',
-  },
-  otpDigitFilled: {
-    color: '#1e1b4b',
-  },
-  otpDigitSuccess: {
-    color: '#047857',
-  },
-  otpPlaceholderDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#cbd5e1',
-    position: 'absolute',
-  },
-  otpCursorBar: {
-    width: 2,
-    height: 22,
-    borderRadius: 1,
-    backgroundColor: '#4f46e5',
-    position: 'absolute',
-  },
-
-  // --- COUNTDOWN RING ---
-  countdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 18,
-  },
-  ringWrap: {
-    width: 26,
-    height: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringSeconds: {
-    position: 'absolute',
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#4338ca',
-  },
-  countdownLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  countdownLabelWarn: {
-    color: '#d97706',
-    fontWeight: '700',
-  },
-  clearOtpBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
-    marginLeft: 4,
-  },
-  clearOtpText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748b',
-  },
-
-  // --- BANNERS ---
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorBannerText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#b91c1c',
-    lineHeight: 17,
-  },
-  infoBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#a7f3d0',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 12,
-  },
-  infoBannerText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#065f46',
-    lineHeight: 17,
-  },
-
-  // --- FOOTER ---
-  backLinkBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 18,
-  },
-  backLinkBottomText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#4f46e5',
-  },
-  footerHelpText: {
-    fontSize: 11.5,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 17,
-    marginTop: 16,
-    paddingHorizontal: 14,
-  },
-});
