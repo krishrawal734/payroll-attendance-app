@@ -80,10 +80,10 @@ export class NotificationService {
           sound: true,
         },
         trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          channelId: Platform.OS === 'android' ? 'workpulse-alerts' : undefined,
           hour: 9,
           minute: 0,
-          repeats: true,
         },
       });
 
@@ -95,10 +95,10 @@ export class NotificationService {
           sound: true,
         },
         trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          channelId: Platform.OS === 'android' ? 'workpulse-alerts' : undefined,
           hour: 19,
           minute: 0,
-          repeats: true,
         },
       });
 

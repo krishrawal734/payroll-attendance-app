@@ -23,10 +23,7 @@ import {
   CalendarDays,
   FileCheck2,
   BellRing,
-  MessageSquare,
 } from 'lucide-react-native';
-import TextBeeModal from '../../src/components/TextBeeModal';
-import { textbeeService } from '../../src/services/textbeeService';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -38,24 +35,20 @@ export default function AdminDashboard() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [totalAdvances, setTotalAdvances] = useState(0);
-  const [smsModalVisible, setSmsModalVisible] = useState(false);
-  const [smsConfig, setSmsConfig] = useState<any>(null);
 
   const loadDashboard = async () => {
     try {
-      const [allEmps, atts, lvs, txs, cfg] = await Promise.all([
+      const [allEmps, atts, lvs, txs] = await Promise.all([
         dataService.getEmployees(),
         dataService.getAttendance(),
         dataService.getLeaves(),
         dataService.getTransactions(),
-        textbeeService.getConfig(),
       ]);
 
       const staff = allEmps.filter((e) => e.role === 'employee');
       setEmployees(staff);
       setAttendance(atts);
       setLeaves(lvs);
-      setSmsConfig(cfg);
 
       // Compute total advance balance
       const taken = txs.filter((t) => t.type === 'ADVANCE_PAID').reduce((sum, t) => sum + t.amount, 0);
@@ -276,41 +269,9 @@ export default function AdminDashboard() {
               </View>
               <ChevronRight size={16} color="#94a3b8" />
             </TouchableOpacity>
-
-            <TouchableOpacity
-              className="flex-row items-center p-3.5"
-              onPress={() => setSmsModalVisible(true)}
-            >
-              <View className="w-10 h-10 rounded-xl bg-indigo-50 items-center justify-center mr-3">
-                <MessageSquare size={18} color="#4338ca" />
-              </View>
-              <View className="flex-1 mr-2">
-                <View className="flex-row items-center">
-                  <Text className="text-sm font-bold text-slate-900">SMS Gateway (TextBee SIM)</Text>
-                  {smsConfig?.isEnabled && (
-                    <View className="ml-2 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      <Text className="text-[9px] font-bold text-emerald-700">Active</Text>
-                    </View>
-                  )}
-                </View>
-                <Text className="text-xs text-slate-500 mt-0.5">
-                  Instant SMS alerts for Salary, Punch & Payslips via mobile SIM.
-                </Text>
-              </View>
-              <ChevronRight size={16} color="#94a3b8" />
-            </TouchableOpacity>
           </View>
         </>
       )}
-
-      {/* TextBee SMS Gateway Settings Modal */}
-      <TextBeeModal
-        visible={smsModalVisible}
-        onClose={() => {
-          setSmsModalVisible(false);
-          loadDashboard();
-        }}
-      />
     </ScrollView>
   );
 }

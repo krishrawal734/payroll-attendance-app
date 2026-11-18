@@ -37,7 +37,9 @@ import {
   AlertCircle,
   Clock,
   CheckCircle2,
+  Smartphone,
   X,
+  RotateCcw,
 } from 'lucide-react-native';
 
 type AuthStep = 'mobile' | 'setup' | 'verify';
@@ -107,7 +109,7 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (!res.success || !res.user) {
-      setErrorMsg(res.message || 'Mobile number not registered. Contact your Admin.');
+      setErrorMsg(res.message || 'Mobile number not registered. Contact your Company Admin.');
       return;
     }
 
@@ -137,7 +139,7 @@ export default function LoginScreen() {
     const isValid = verifyTotpCode(setupSecret, code, 1);
     if (!isValid) {
       setErrorMsg(
-        'Code did not match. Make sure you added WorkPulse in Google Authenticator and enter the latest 6-digit code.'
+        'Code did not match. Ensure WorkPulse is added in Google Authenticator and enter the latest 6-digit code.'
       );
       return;
     }
@@ -197,6 +199,12 @@ export default function LoginScreen() {
     }
   };
 
+  const handleClearOtp = () => {
+    setOtpCode('');
+    setErrorMsg(null);
+    otpInputRef.current?.focus();
+  };
+
   const handleOpenAuthenticatorApp = async () => {
     if (!pendingUser || !setupSecret) return;
     setErrorMsg(null);
@@ -214,7 +222,7 @@ export default function LoginScreen() {
         );
       } else {
         setErrorMsg(
-          'Google Authenticator app was not detected on this device. Install it from Play Store or enter the setup key manually.'
+          'Google Authenticator app was not detected. Install it from Play Store or enter the manual key below.'
         );
       }
     } catch {
@@ -222,7 +230,7 @@ export default function LoginScreen() {
         await Linking.openURL(uri);
       } catch {
         setErrorMsg(
-          'Could not launch Google Authenticator automatically. Open Google Authenticator → Tap "+" → "Enter a setup key" and paste the key below.'
+          'Could not launch Google Authenticator automatically. Open it manually → "+" → "Enter a setup key".'
         );
       }
     }
@@ -236,7 +244,7 @@ export default function LoginScreen() {
         title: 'WorkPulse Google Authenticator Setup Key',
       });
     } catch {
-      // User dismissed share sheet
+      // Dismissed share sheet
     }
   };
 
@@ -270,56 +278,70 @@ export default function LoginScreen() {
   const renderOtpBoxes = () => {
     const digits = otpCode.split('');
     return (
-      <TouchableOpacity
-        activeOpacity={1}
-        className="flex-row justify-between gap-2 mb-4 relative"
-        onPress={() => otpInputRef.current?.focus()}
-      >
-        <TextInput
-          ref={otpInputRef}
-          className="absolute inset-0 w-full h-full z-10"
-          style={{ opacity: 0.01 }}
-          value={otpCode}
-          onChangeText={handleOtpChange}
-          keyboardType="number-pad"
-          maxLength={6}
-          autoComplete="one-time-code"
-          textContentType="oneTimeCode"
-          caretHidden
-        />
-        {[0, 1, 2, 3, 4, 5].map((index) => {
-          const digit = digits[index] || '';
-          const isActive = index === otpCode.length || (otpCode.length === 6 && index === 5);
-          const isFilled = digit !== '';
+      <View className="mb-3">
+        <TouchableOpacity
+          activeOpacity={1}
+          className="flex-row justify-between gap-2 relative"
+          onPress={() => otpInputRef.current?.focus()}
+        >
+          <TextInput
+            ref={otpInputRef}
+            className="absolute inset-0 w-full h-full z-10"
+            style={{ opacity: 0.01 }}
+            value={otpCode}
+            onChangeText={handleOtpChange}
+            keyboardType="number-pad"
+            maxLength={6}
+            autoComplete="one-time-code"
+            textContentType="oneTimeCode"
+            caretHidden
+          />
+          {[0, 1, 2, 3, 4, 5].map((index) => {
+            const digit = digits[index] || '';
+            const isActive = index === otpCode.length || (otpCode.length === 6 && index === 5);
+            const isFilled = digit !== '';
 
-          const boxClasses = errorMsg
-            ? 'border-2 border-rose-400 bg-rose-50'
-            : isActive
-              ? 'border-2 border-indigo-600 bg-white'
-              : isFilled
-                ? 'border-2 border-indigo-400 bg-indigo-50'
-                : 'border border-slate-300 bg-slate-50';
+            const boxClasses = errorMsg
+              ? 'border-rose-400 bg-rose-50 border-2'
+              : isActive
+                ? 'border-indigo-600 bg-white border-2'
+                : isFilled
+                  ? 'border-indigo-400 bg-indigo-50 border-2'
+                  : 'border-slate-200 bg-slate-50 border';
 
-          return (
-            <View
-              key={index}
-              className={`flex-1 h-14 rounded-2xl items-center justify-center ${boxClasses}`}
-            >
-              <Text
-                className={`text-2xl font-extrabold ${
-                  errorMsg
-                    ? 'text-rose-700'
-                    : isFilled
-                      ? 'text-indigo-950'
-                      : 'text-slate-300'
-                }`}
+            return (
+              <View
+                key={index}
+                className={`flex-1 h-14 rounded-2xl items-center justify-center ${boxClasses}`}
               >
-                {digit || '•'}
-              </Text>
-            </View>
-          );
-        })}
-      </TouchableOpacity>
+                <Text
+                  className={`text-2xl font-extrabold ${
+                    errorMsg
+                      ? 'text-rose-700'
+                      : isFilled
+                        ? 'text-indigo-950'
+                        : 'text-slate-300'
+                  }`}
+                >
+                  {digit || '•'}
+                </Text>
+              </View>
+            );
+          })}
+        </TouchableOpacity>
+
+        {otpCode.length > 0 && (
+          <View className="flex-row justify-end mt-2">
+            <TouchableOpacity
+              onPress={handleClearOtp}
+              className="flex-row items-center gap-1 px-2 py-1"
+            >
+              <RotateCcw size={12} color="#64748b" />
+              <Text className="text-xs font-semibold text-slate-500">Clear code</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     );
   };
 
@@ -328,14 +350,23 @@ export default function LoginScreen() {
     const isExpiring = secondsLeft <= 5;
     return (
       <View className="mb-5">
-        <View className="flex-row items-center justify-center gap-1.5 mb-2">
-          <Clock size={13} color={isExpiring ? '#d97706' : '#64748b'} />
+        <View className="flex-row items-center justify-between mb-1.5 px-0.5">
+          <View className="flex-row items-center gap-1.5">
+            <Clock size={13} color={isExpiring ? '#d97706' : '#64748b'} />
+            <Text
+              className={`text-xs font-semibold ${
+                isExpiring ? 'text-amber-600' : 'text-slate-500'
+              }`}
+            >
+              {isExpiring ? 'Code expiring soon...' : 'Current code cycle'}
+            </Text>
+          </View>
           <Text
-            className={`text-xs font-semibold ${
-              isExpiring ? 'text-amber-600 font-bold' : 'text-slate-500'
+            className={`text-xs font-extrabold ${
+              isExpiring ? 'text-amber-600' : 'text-indigo-600'
             }`}
           >
-            Authenticator code refreshes in {secondsLeft}s
+            {secondsLeft}s
           </Text>
         </View>
         <View className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
@@ -360,35 +391,58 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Hero */}
+        {/* Top Branded Dark Hero Header */}
         <View className="bg-indigo-950 pt-14 pb-16 px-6 rounded-b-[36px] items-center">
           <View className="w-20 h-20 rounded-3xl bg-indigo-900 border border-indigo-700 items-center justify-center mb-3.5">
             <WorkPulseLogo size={54} />
           </View>
+
           <Text className="text-3xl font-extrabold text-white tracking-tight">WorkPulse</Text>
-          <Text className="text-sm text-indigo-200 mt-1 text-center">
+          <Text className="text-xs font-medium text-indigo-200 mt-1 text-center">
             Employee Attendance & Payroll Platform
           </Text>
+
           <View className="flex-row items-center gap-1.5 mt-3.5 px-3.5 py-1.5 rounded-full bg-indigo-900 border border-indigo-700">
             <ShieldCheck size={13} color="#34d399" />
-            <Text className="text-xs font-bold text-indigo-100">Google Authenticator Login</Text>
+            <Text className="text-[11px] font-bold text-indigo-100">
+              Google Authenticator Secured
+            </Text>
           </View>
         </View>
 
-        {/* Main Floating Card Area */}
+        {/* Main Floating Card */}
         <View className="-mt-9 mx-5">
           {/* STEP 1: MOBILE NUMBER */}
           {step === 'mobile' && (
             <>
               <View
-                className="bg-white rounded-3xl p-6 border border-slate-200 mb-5"
+                className="bg-white rounded-3xl p-6 border border-slate-200"
                 style={CARD_ELEVATION}
               >
-                <Text className="text-xl font-extrabold text-slate-900">Sign In</Text>
-                <Text className="text-xs text-slate-500 mt-1.5 mb-5 leading-5">
-                  Enter your 10-digit registered mobile number, then verify with your 6-digit Google Authenticator code.
+                {/* Step Pill */}
+                <View className="flex-row items-center justify-between mb-4">
+                  <View className="px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200">
+                    <Text className="text-[10px] font-extrabold text-indigo-700 tracking-wider">
+                      STEP 1 OF 2
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center gap-1.5">
+                    <View className="w-6 h-1.5 rounded-full bg-indigo-600" />
+                    <View className="w-2.5 h-1.5 rounded-full bg-slate-200" />
+                  </View>
+                </View>
+
+                <Text className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                  Welcome Back
+                </Text>
+                <Text className="text-xs text-slate-500 mt-1.5 mb-6 leading-5">
+             Enter your 10-digit registered mobile number to access your self-service portal.
                 </Text>
 
+                {/* Mobile Number Field */}
+                <Text className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                  Registered Mobile Number
+                </Text>
                 <View
                   className={`flex-row items-center rounded-2xl overflow-hidden mb-4 ${
                     errorMsg
@@ -398,12 +452,13 @@ export default function LoginScreen() {
                         : 'border border-slate-300 bg-slate-50'
                   }`}
                 >
-                  <View className="px-4 py-4 bg-slate-100 border-r border-slate-200">
+                  <View className="px-3.5 py-4 bg-slate-100 border-r border-slate-200 flex-row items-center gap-1.5">
+                    <Smartphone size={15} color="#475569" />
                     <Text className="text-base font-extrabold text-slate-700">+91</Text>
                   </View>
                   <TextInput
-                    className="flex-1 px-4 py-4 text-base font-bold text-slate-900 tracking-wider"
-                    placeholder="Enter 10-digit number"
+                    className="flex-1 px-3.5 py-4 text-base font-bold text-slate-900 tracking-widest"
+                    placeholder="98765 43210"
                     placeholderTextColor="#94a3b8"
                     keyboardType="phone-pad"
                     maxLength={10}
@@ -443,7 +498,7 @@ export default function LoginScreen() {
 
                 <TouchableOpacity
                   className={`bg-indigo-600 rounded-2xl py-4 flex-row items-center justify-center gap-2 ${
-                    loading ? 'opacity-60' : 'opacity-100'
+                    loading || mobileNumber.length < 10 ? 'opacity-60' : 'opacity-100'
                   }`}
                   style={BUTTON_ELEVATION}
                   activeOpacity={0.85}
@@ -455,7 +510,7 @@ export default function LoginScreen() {
                   ) : (
                     <>
                       <Text className="text-white text-base font-bold">
-                        Continue to Authenticator
+                        Continue to Login
                       </Text>
                       <ArrowRight size={18} color="#ffffff" />
                     </>
@@ -463,24 +518,26 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Info Card */}
-              <View className="bg-white rounded-2xl p-4 border border-slate-200">
-                <View className="flex-row items-center gap-1.5 mb-1.5">
-                  <Shield size={15} color="#4f46e5" />
-                  <Text className="text-[11px] font-extrabold text-slate-800 tracking-wider">
-                    GOOGLE AUTHENTICATOR PROTECTED
-                  </Text>
-                </View>
-                <Text className="text-xs text-slate-600 leading-5">
-                  WorkPulse uses time-based 6-digit codes from Google Authenticator instead of SMS OTPs. It works 100% offline and protects both Admin and Employee accounts.
-                </Text>
-                <View className="mt-3 pt-3 border-t border-slate-100 flex-row items-center gap-2">
-                  <UserCheck size={14} color="#64748b" />
-                  <Text className="flex-1 text-[11px] font-semibold text-slate-500">
-                    First time logging in? You will link Google Authenticator in one tap.
-                  </Text>
-                </View>
-              </View>
+              {/* Security & Access Notice */}
+        <View className="mt-4 bg-slate-100/80 rounded-2xl p-4 border border-slate-200">
+          <View className="flex-row items-center mb-1.5">
+            <Shield size={16} color="#4f46e5" />
+            <Text className="text-xs font-black text-slate-800 uppercase tracking-wider ml-1.5">
+              Secure Cloud Access
+            </Text>
+          </View>
+          <Text className="text-xs text-slate-600 leading-relaxed">
+            Enter your 10-digit registered mobile number to securely sign in. Your role (Admin or Employee) and assigned factory shifts will be authenticated automatically via cloud database.
+          </Text>
+          <View className="mt-3 pt-2.5 border-t border-slate-200 flex-row items-center">
+            <UserCheck size={14} color="#64748b" />
+            <Text className="text-[11px] text-slate-500 font-semibold ml-1.5">
+              New employee enrollment? Contact your Company Administrator.
+            </Text>
+          </View>
+        </View>
+
+              
             </>
           )}
 
@@ -490,15 +547,23 @@ export default function LoginScreen() {
               className="bg-white rounded-3xl p-6 border border-slate-200"
               style={CARD_ELEVATION}
             >
-              <TouchableOpacity
-                className="flex-row items-center gap-1.5 mb-4 py-1 self-start"
-                onPress={handleResetToMobile}
-              >
-                <ArrowLeft size={16} color="#4f46e5" />
-                <Text className="text-xs font-bold text-indigo-600">Change Mobile Number</Text>
-              </TouchableOpacity>
+              {/* Top Nav + Step Progress */}
+              <View className="flex-row items-center justify-between mb-4">
+                <TouchableOpacity
+                  className="flex-row items-center gap-1.5 py-1 pr-2"
+                  onPress={handleResetToMobile}
+                >
+                  <ArrowLeft size={16} color="#4f46e5" />
+                  <Text className="text-xs font-bold text-indigo-600">Change Number</Text>
+                </TouchableOpacity>
 
-              {/* User Pill */}
+                <View className="flex-row items-center gap-1.5">
+                  <View className="w-2.5 h-1.5 rounded-full bg-indigo-200" />
+                  <View className="w-6 h-1.5 rounded-full bg-indigo-600" />
+                </View>
+              </View>
+
+              {/* User Identity Pill */}
               <View className="flex-row items-center bg-slate-50 rounded-2xl p-3.5 border border-slate-200 mb-5 gap-3">
                 <View className="w-11 h-11 rounded-2xl bg-indigo-600 items-center justify-center">
                   <Text className="text-sm font-extrabold text-white">
@@ -514,46 +579,55 @@ export default function LoginScreen() {
                   </Text>
                 </View>
                 <View className="px-2.5 py-1 rounded-full bg-amber-100 border border-amber-200">
-                  <Text className="text-[10px] font-extrabold text-amber-800">1st Login</Text>
+                  <Text className="text-[10px] font-extrabold text-amber-800">1st Setup</Text>
                 </View>
               </View>
 
               <Text className="text-xl font-extrabold text-slate-900">
                 Link Google Authenticator
               </Text>
-              <Text className="text-xs text-slate-500 mt-1.5 mb-5 leading-5">
-                One-time setup: add WorkPulse to your Google Authenticator app, then enter the 6-digit code below.
+              <Text className="text-xs text-slate-500 mt-1 mb-5 leading-5">
+                One-time setup: connect WorkPulse to Google Authenticator, then enter the 6-digit code below.
               </Text>
 
-              {/* Step 1: One-tap open */}
+              {/* Part 1: Add to Authenticator */}
+              <View className="flex-row items-center gap-2 mb-2.5">
+                <View className="w-5 h-5 rounded-full bg-indigo-600 items-center justify-center">
+                  <Text className="text-[11px] font-extrabold text-white">1</Text>
+                </View>
+                <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                  Add Account to Authenticator
+                </Text>
+              </View>
+
               <TouchableOpacity
-                className="bg-slate-900 rounded-2xl py-4 flex-row items-center justify-center gap-2 mb-2.5"
+                className="bg-slate-900 rounded-2xl py-3.5 flex-row items-center justify-center gap-2 mb-2"
                 activeOpacity={0.85}
                 onPress={handleOpenAuthenticatorApp}
               >
-                <ExternalLink size={17} color="#ffffff" />
-                <Text className="text-white text-sm font-bold">Add to Google Authenticator</Text>
+                <ExternalLink size={16} color="#ffffff" />
+                <Text className="text-white text-sm font-bold">Open in Google Authenticator</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                className="items-center py-1 mb-5"
+                className="items-center py-1 mb-4"
                 onPress={handleInstallAuthenticator}
               >
                 <Text className="text-xs font-semibold text-indigo-600">
-                  Don't have Google Authenticator? Install from Play Store →
+                  Don't have the app? Download from Play Store →
                 </Text>
               </TouchableOpacity>
 
-              {/* QR Code + Manual Key */}
+              {/* QR Code + Manual Setup Key */}
               <View className="items-center bg-slate-50 rounded-2xl p-4 border border-slate-200 mb-5">
-                <Text className="text-[10px] font-extrabold text-slate-500 tracking-wider mb-3">
-                  OR SCAN QR CODE / COPY SETUP KEY
+                <Text className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-3">
+                  Or Scan QR Code / Use Key
                 </Text>
-                <QrCodeSvg value={totpUri} size={164} />
+                <QrCodeSvg value={totpUri} size={156} />
 
                 <View className="w-full mt-4 bg-white rounded-xl p-3 border border-slate-200 items-center">
-                  <Text className="text-[11px] font-semibold text-slate-500 mb-1.5">
-                    Manual Setup Key (Time-based)
+                  <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Manual Setup Key
                   </Text>
                   <Text
                     className="text-xs font-extrabold text-slate-900 text-center tracking-widest"
@@ -581,10 +655,15 @@ export default function LoginScreen() {
                 </View>
               )}
 
-              {/* Step 2: Enter 6-digit code */}
-              <Text className="text-xs font-bold text-slate-700 mb-3 text-center">
-                Enter the 6-digit code shown in Google Authenticator
-              </Text>
+              {/* Part 2: Enter 6-Digit Code */}
+              <View className="flex-row items-center gap-2 mb-3">
+                <View className="w-5 h-5 rounded-full bg-indigo-600 items-center justify-center">
+                  <Text className="text-[11px] font-extrabold text-white">2</Text>
+                </View>
+                <Text className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                  Enter 6-Digit Code
+                </Text>
+              </View>
 
               {renderOtpBoxes()}
               {renderCountdownBar()}
@@ -600,7 +679,7 @@ export default function LoginScreen() {
 
               <TouchableOpacity
                 className={`bg-indigo-600 rounded-2xl py-4 flex-row items-center justify-center gap-2 ${
-                  loading || otpCode.length < 6 ? 'opacity-55' : 'opacity-100'
+                  loading || otpCode.length < 6 ? 'opacity-50' : 'opacity-100'
                 }`}
                 style={BUTTON_ELEVATION}
                 activeOpacity={0.85}
@@ -627,15 +706,23 @@ export default function LoginScreen() {
               className="bg-white rounded-3xl p-6 border border-slate-200"
               style={CARD_ELEVATION}
             >
-              <TouchableOpacity
-                className="flex-row items-center gap-1.5 mb-4 py-1 self-start"
-                onPress={handleResetToMobile}
-              >
-                <ArrowLeft size={16} color="#4f46e5" />
-                <Text className="text-xs font-bold text-indigo-600">Change Mobile Number</Text>
-              </TouchableOpacity>
+              {/* Top Nav + Step Progress */}
+              <View className="flex-row items-center justify-between mb-4">
+                <TouchableOpacity
+                  className="flex-row items-center gap-1.5 py-1 pr-2"
+                  onPress={handleResetToMobile}
+                >
+                  <ArrowLeft size={16} color="#4f46e5" />
+                  <Text className="text-xs font-bold text-indigo-600">Change Number</Text>
+                </TouchableOpacity>
 
-              {/* User Pill */}
+                <View className="flex-row items-center gap-1.5">
+                  <View className="w-2.5 h-1.5 rounded-full bg-indigo-200" />
+                  <View className="w-6 h-1.5 rounded-full bg-indigo-600" />
+                </View>
+              </View>
+
+              {/* User Identity Pill */}
               <View className="flex-row items-center bg-slate-50 rounded-2xl p-3.5 border border-slate-200 mb-6 gap-3">
                 <View className="w-11 h-11 rounded-2xl bg-indigo-600 items-center justify-center">
                   <Text className="text-sm font-extrabold text-white">
@@ -650,22 +737,21 @@ export default function LoginScreen() {
                     +91 {maskMobile(pendingUser.mobileNumber)} • {pendingUser.role.toUpperCase()}
                   </Text>
                 </View>
-                <View className="flex-row items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200">
-                  <ShieldCheck size={12} color="#059669" />
-                  <Text className="text-[10px] font-extrabold text-emerald-700">2FA Active</Text>
+               
+              </View>
+
+              {/* Center Authenticator Prompt */}
+              <View className="items-center mb-5">
+                <View className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 items-center justify-center mb-3">
+                  <KeyRound size={26} color="#4f46e5" />
                 </View>
+                <Text className="text-xl font-extrabold text-slate-900 text-center">
+                ENTER OTP TO LOGIN
+                </Text>
+                <Text className="text-xs text-slate-500 text-center mt-1.5 leading-5 px-2">
+               Enter the 6-digit code to securely sign in. This code is  refreshes every 30 seconds.
+                </Text>
               </View>
-
-              <View className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 items-center justify-center self-center mb-3">
-                <KeyRound size={24} color="#4f46e5" />
-              </View>
-
-              <Text className="text-xl font-extrabold text-slate-900 text-center">
-                Enter Authenticator Code
-              </Text>
-              <Text className="text-xs text-slate-500 text-center mt-1.5 mb-5 leading-5">
-                Open Google Authenticator on your phone and enter the 6-digit code for WorkPulse.
-              </Text>
 
               {renderOtpBoxes()}
               {renderCountdownBar()}
@@ -681,7 +767,7 @@ export default function LoginScreen() {
 
               <TouchableOpacity
                 className={`bg-indigo-600 rounded-2xl py-4 flex-row items-center justify-center gap-2 ${
-                  loading || otpCode.length < 6 ? 'opacity-55' : 'opacity-100'
+                  loading || otpCode.length < 6 ? 'opacity-50' : 'opacity-100'
                 }`}
                 style={BUTTON_ELEVATION}
                 activeOpacity={0.85}
@@ -698,11 +784,7 @@ export default function LoginScreen() {
                 )}
               </TouchableOpacity>
 
-              <View className="mt-4 pt-3.5 border-t border-slate-100">
-                <Text className="text-[11px] text-slate-500 text-center leading-4">
-                  Lost access to Google Authenticator? Contact your Company Admin to reset your 2FA.
-                </Text>
-              </View>
+              
             </View>
           )}
         </View>
