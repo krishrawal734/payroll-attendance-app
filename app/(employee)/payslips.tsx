@@ -74,7 +74,7 @@ export default function EmployeePayslipsScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       {/* Financial Standing Banner */}
-      <View className="bg-indigo-950 rounded-3xl p-6 mb-5 shadow-sm">
+      <View className="bg-indigo-950 rounded-3xl p-6 mb-5">
         <Text className="text-indigo-300 text-xs font-bold uppercase tracking-wider">
           Current Financial Standing
         </Text>
@@ -114,7 +114,7 @@ export default function EmployeePayslipsScreen() {
         </View>
       ) : (
         payslips.map((ps) => (
-          <View key={ps.id} className="bg-white rounded-2xl p-4 border border-slate-200 mb-3 shadow-xs">
+          <View key={ps.id} className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
             <View className="flex-row justify-between items-start mb-2.5">
               <View>
                 <Text className="text-sm font-extrabold text-slate-900">Month: {ps.monthYear}</Text>
@@ -158,7 +158,7 @@ export default function EmployeePayslipsScreen() {
               </View>
 
               <TouchableOpacity
-                className="bg-indigo-600 flex-row items-center px-3.5 py-2 rounded-xl shadow-xs"
+                className="bg-indigo-600 flex-row items-center px-3.5 py-2 rounded-xl"
                 disabled={downloadingId === ps.id}
                 onPress={() => handleSharePayslip(ps)}
               >
@@ -178,7 +178,7 @@ export default function EmployeePayslipsScreen() {
 
       {/* Salary & Advance Payment History */}
       <Text className="text-base font-extrabold text-slate-900 mb-3 mt-1">Transaction & Advance History</Text>
-      <View className="bg-white rounded-2xl p-3 border border-slate-200 shadow-xs">
+      <View className="bg-white rounded-2xl p-3 border border-slate-200">
         {transactions.length === 0 ? (
           <Text className="text-xs text-slate-400 p-2">No salary or advance transactions recorded.</Text>
         ) : (

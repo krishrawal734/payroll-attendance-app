@@ -96,7 +96,7 @@ export default function AdminDashboard() {
           <Text className="text-2xl font-black text-slate-900 mt-0.5">{user?.fullName || 'Administrator'}</Text>
         </View>
         <TouchableOpacity
-          className="flex-row items-center bg-indigo-600 px-3.5 py-2.5 rounded-xl shadow-sm active:bg-indigo-700"
+          className="flex-row items-center bg-indigo-600 px-3.5 py-2.5 rounded-xl"
           onPress={() => router.push('/(admin)/employees')}
         >
           <Plus size={15} color="#ffffff" />
@@ -115,7 +115,7 @@ export default function AdminDashboard() {
           <View className="flex-row flex-wrap justify-between mb-5">
             {/* Total Employees */}
             <TouchableOpacity
-              className="w-[48%] bg-white rounded-2xl p-4 border border-slate-200 mb-3 shadow-xs"
+              className="w-[48%] bg-white rounded-2xl p-4 border border-slate-200 mb-3"
               onPress={() => router.push('/(admin)/employees')}
             >
               <View className="w-8 h-8 rounded-lg bg-indigo-50 items-center justify-center mb-2">
@@ -127,7 +127,7 @@ export default function AdminDashboard() {
 
             {/* Present Today */}
             <TouchableOpacity
-              className="w-[48%] bg-white rounded-2xl p-4 border border-slate-200 mb-3 shadow-xs"
+              className="w-[48%] bg-white rounded-2xl p-4 border border-slate-200 mb-3"
               onPress={() => router.push('/(admin)/attendance')}
             >
               <View className="w-8 h-8 rounded-lg bg-emerald-50 items-center justify-center mb-2">
@@ -139,7 +139,7 @@ export default function AdminDashboard() {
 
             {/* Night Shifts */}
             <TouchableOpacity
-              className="w-[48%] bg-purple-50/50 rounded-2xl p-4 border border-purple-200 mb-3 shadow-xs"
+              className="w-[48%] bg-purple-50/50 rounded-2xl p-4 border border-purple-200 mb-3"
               onPress={() => router.push('/(admin)/attendance')}
             >
               <View className="w-8 h-8 rounded-lg bg-purple-100 items-center justify-center mb-2">
@@ -151,7 +151,7 @@ export default function AdminDashboard() {
 
             {/* Pending Leaves */}
             <TouchableOpacity
-              className={`w-[48%] rounded-2xl p-4 border mb-3 shadow-xs ${
+              className={`w-[48%] rounded-2xl p-4 border mb-3 ${
                 pendingLeaves.length > 0
                   ? 'bg-amber-50/80 border-amber-300'
                   : 'bg-white border-slate-200'
@@ -167,7 +167,7 @@ export default function AdminDashboard() {
           </View>
 
           {/* Company Financial & Advance Exposure Card */}
-          <View className="bg-slate-900 rounded-3xl p-5 mb-6 shadow-sm">
+          <View className="bg-slate-900 rounded-3xl p-5 mb-6">
             <View className="flex-row justify-between items-start">
               <View>
                 <Text className="text-slate-400 text-xs font-bold uppercase tracking-wider">
@@ -188,14 +188,14 @@ export default function AdminDashboard() {
 
             <View className="flex-row mt-4 space-x-2">
               <TouchableOpacity
-                className="flex-1 bg-slate-800 py-3 rounded-xl items-center mr-2 active:bg-slate-700"
+                className="flex-1 bg-slate-800 py-3 rounded-xl items-center mr-2"
                 onPress={() => router.push('/(admin)/payroll')}
               >
                 <Text className="text-slate-200 text-xs font-bold">Record UPI/Cash</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                className="flex-1 bg-indigo-600 py-3 rounded-xl items-center active:bg-indigo-700"
+                className="flex-1 bg-indigo-600 py-3 rounded-xl items-center"
                 onPress={() => router.push('/(admin)/payroll')}
               >
                 <Text className="text-white text-xs font-bold">Generate Payslips</Text>
@@ -205,7 +205,7 @@ export default function AdminDashboard() {
 
           {/* Operations Hub */}
           <Text className="text-base font-extrabold text-slate-900 mb-3">Operations & Management Hub</Text>
-          <View className="bg-white rounded-2xl border border-slate-200 shadow-xs divide-y divide-slate-100">
+          <View className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
             <TouchableOpacity
               className="flex-row items-center p-3.5"
               onPress={() => router.push('/(admin)/employees')}

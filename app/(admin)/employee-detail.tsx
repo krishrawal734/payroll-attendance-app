@@ -183,7 +183,7 @@ export default function EmployeeDetailScreen() {
       </TouchableOpacity>
 
       {/* Profile Card */}
-      <View className="bg-white rounded-2xl p-4 border border-slate-200 mb-4 shadow-xs">
+      <View className="bg-white rounded-2xl p-4 border border-slate-200 mb-4">
         <View className="flex-row items-center mb-4">
           <View className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 items-center justify-center mr-3">
             <Text className="text-base font-black text-indigo-700">
@@ -279,7 +279,7 @@ export default function EmployeeDetailScreen() {
       </View>
 
       {/* Financial Health & Advance Passbook */}
-      <View className="bg-indigo-950 rounded-3xl p-5 mb-5 shadow-sm">
+      <View className="bg-indigo-950 rounded-3xl p-5 mb-5">
         <Text className="text-indigo-300 text-[10px] font-black uppercase tracking-wider">
           EMPLOYEE PASSBOOK
         </Text>
@@ -309,7 +309,7 @@ export default function EmployeeDetailScreen() {
         </View>
 
         <TouchableOpacity
-          className="bg-indigo-600 rounded-xl py-3 flex-row items-center justify-center shadow-xs"
+          className="bg-indigo-600 rounded-xl py-3 flex-row items-center justify-center"
           onPress={() => setModalVisible(true)}
         >
           <PlusCircle size={16} color="#ffffff" />
@@ -332,7 +332,7 @@ export default function EmployeeDetailScreen() {
         transactions.map((tx) => (
           <View
             key={tx.id}
-            className="bg-white rounded-2xl p-3.5 flex-row justify-between items-center border border-slate-200 mb-2.5 shadow-xs"
+            className="bg-white rounded-2xl p-3.5 flex-row justify-between items-center border border-slate-200 mb-2.5"
           >
             <View className="flex-row items-center flex-1 mr-2">
               <View
@@ -439,7 +439,7 @@ export default function EmployeeDetailScreen() {
                     key={mode}
                     className={`flex-1 py-2 items-center rounded-xl border mr-1.5 last:mr-0 ${
                       paymentMode === mode
-                        ? 'bg-indigo-600 border-indigo-600 shadow-xs'
+                        ? 'bg-indigo-600 border-indigo-600'
                         : 'bg-slate-50 border-slate-300'
                     }`}
                     onPress={() => setPaymentMode(mode)}
@@ -488,7 +488,7 @@ export default function EmployeeDetailScreen() {
               />
 
               <TouchableOpacity
-                className="bg-indigo-600 py-3.5 rounded-xl items-center shadow-xs mb-8"
+                className="bg-indigo-600 py-3.5 rounded-xl items-center mb-8"
                 onPress={handleRecordPayment}
                 disabled={submitting}
               >

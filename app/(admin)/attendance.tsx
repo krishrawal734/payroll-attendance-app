@@ -219,7 +219,7 @@ export default function AdminAttendanceScreen() {
 
           {/* Export Report Master Button */}
           <TouchableOpacity
-            className="flex-row items-center bg-indigo-600 px-3 py-2.5 rounded-xl shadow-xs active:bg-indigo-700"
+            className="flex-row items-center bg-indigo-600 px-3 py-2.5 rounded-xl"
             onPress={() => openExportModal()}
             disabled={exporting}
           >
@@ -245,7 +245,7 @@ export default function AdminAttendanceScreen() {
           <TouchableOpacity
             className={`flex-row items-center px-3 py-1.5 rounded-xl border mr-1.5 ${
               filter === 'MONTH'
-                ? 'bg-indigo-600 border-indigo-600 shadow-xs'
+                ? 'bg-indigo-600 border-indigo-600'
                 : 'bg-slate-50 border-slate-300'
             }`}
             onPress={() => setFilter('MONTH')}
@@ -264,7 +264,7 @@ export default function AdminAttendanceScreen() {
           <TouchableOpacity
             className={`flex-row items-center px-3 py-1.5 rounded-xl border mr-1.5 ${
               filter === 'WEEK'
-                ? 'bg-indigo-600 border-indigo-600 shadow-xs'
+                ? 'bg-indigo-600 border-indigo-600'
                 : 'bg-slate-50 border-slate-300'
             }`}
             onPress={() => setFilter('WEEK')}
@@ -283,7 +283,7 @@ export default function AdminAttendanceScreen() {
           <TouchableOpacity
             className={`flex-row items-center px-3 py-1.5 rounded-xl border mr-1.5 ${
               filter === 'TODAY'
-                ? 'bg-slate-900 border-slate-900 shadow-xs'
+                ? 'bg-slate-900 border-slate-900'
                 : 'bg-slate-50 border-slate-300'
             }`}
             onPress={() => setFilter('TODAY')}
@@ -302,7 +302,7 @@ export default function AdminAttendanceScreen() {
           <TouchableOpacity
             className={`flex-row items-center px-3 py-1.5 rounded-xl border mr-1.5 ${
               filter === 'NIGHT'
-                ? 'bg-purple-700 border-purple-700 shadow-xs'
+                ? 'bg-purple-700 border-purple-700'
                 : 'bg-slate-50 border-purple-200'
             }`}
             onPress={() => setFilter('NIGHT')}
@@ -321,7 +321,7 @@ export default function AdminAttendanceScreen() {
           <TouchableOpacity
             className={`px-3 py-1.5 rounded-xl border ${
               filter === 'ALL'
-                ? 'bg-slate-800 border-slate-800 shadow-xs'
+                ? 'bg-slate-800 border-slate-800'
                 : 'bg-slate-50 border-slate-300'
             }`}
             onPress={() => setFilter('ALL')}
@@ -357,7 +357,7 @@ export default function AdminAttendanceScreen() {
             filtered.map((record) => {
               const emp = employees.find((e) => e.id === record.employeeId);
               return (
-                <View key={record.id} className="bg-white rounded-2xl p-3.5 border border-slate-200 mb-2.5 shadow-xs">
+                <View key={record.id} className="bg-white rounded-2xl p-3.5 border border-slate-200 mb-2.5">
                   <View className="flex-row justify-between items-center mb-2.5">
                     <View className="flex-row items-center">
                       <View className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 items-center justify-center mr-2">
@@ -619,7 +619,7 @@ export default function AdminAttendanceScreen() {
             <View className="space-y-2">
               {/* Share PDF Button */}
               <TouchableOpacity
-                className="flex-row items-center justify-center bg-indigo-600 py-3.5 px-4 rounded-2xl shadow-sm mb-2 active:bg-indigo-700"
+                className="flex-row items-center justify-center bg-indigo-600 py-3.5 px-4 rounded-2xl mb-2"
                 onPress={() => handleSharePdf(exportPeriod)}
                 disabled={exporting}
               >
@@ -637,7 +637,7 @@ export default function AdminAttendanceScreen() {
 
               {/* Save PDF to Phone Button */}
               <TouchableOpacity
-                className="flex-row items-center justify-center bg-sky-600 py-3.5 px-4 rounded-2xl shadow-sm mb-2 active:bg-sky-700"
+                className="flex-row items-center justify-center bg-sky-600 py-3.5 px-4 rounded-2xl mb-2"
                 onPress={() => handleSavePdf(exportPeriod)}
                 disabled={exporting}
               >
@@ -649,7 +649,7 @@ export default function AdminAttendanceScreen() {
 
               {/* Export Excel / CSV Button */}
               <TouchableOpacity
-                className="flex-row items-center justify-center bg-emerald-600 py-3.5 px-4 rounded-2xl shadow-sm active:bg-emerald-700"
+                className="flex-row items-center justify-center bg-emerald-600 py-3.5 px-4 rounded-2xl"
                 onPress={() => handleExportCsv(exportPeriod)}
                 disabled={exporting}
               >

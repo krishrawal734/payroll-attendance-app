@@ -290,7 +290,7 @@ export default function AdminPayrollScreen() {
           <View className="flex-row items-center">
             {/* Export Register Button */}
             <TouchableOpacity
-              className="flex-row items-center bg-indigo-600 px-3 py-2 rounded-xl mr-2.5 shadow-xs active:bg-indigo-700"
+              className="flex-row items-center bg-indigo-600 px-3 py-2 rounded-xl mr-2.5"
               onPress={() => setExportModalVisible(true)}
               disabled={exporting}
             >
@@ -312,7 +312,7 @@ export default function AdminPayrollScreen() {
                 return (
                   <TouchableOpacity
                     key={m}
-                    className={`px-2.5 py-1 rounded-lg ${active ? 'bg-white shadow-xs' : ''}`}
+                    className={`px-2.5 py-1 rounded-lg ${active ? 'bg-white' : ''}`}
                     onPress={() => setSelectedMonth(m)}
                   >
                     <Text
@@ -349,7 +349,7 @@ export default function AdminPayrollScreen() {
           <TouchableOpacity
             className={`px-3 py-1.5 rounded-xl border mr-1.5 ${
               payrollFilter === 'ALL'
-                ? 'bg-slate-900 border-slate-900 shadow-xs'
+                ? 'bg-slate-900 border-slate-900'
                 : 'bg-slate-50 border-slate-300'
             }`}
             onPress={() => setPayrollFilter('ALL')}
@@ -366,7 +366,7 @@ export default function AdminPayrollScreen() {
           <TouchableOpacity
             className={`px-3 py-1.5 rounded-xl border mr-1.5 ${
               payrollFilter === 'ADVANCE'
-                ? 'bg-rose-600 border-rose-600 shadow-xs'
+                ? 'bg-rose-600 border-rose-600'
                 : 'bg-slate-50 border-rose-200'
             }`}
             onPress={() => setPayrollFilter('ADVANCE')}
@@ -383,7 +383,7 @@ export default function AdminPayrollScreen() {
           <TouchableOpacity
             className={`px-3 py-1.5 rounded-xl border mr-1.5 ${
               payrollFilter === 'SLIP_DONE'
-                ? 'bg-emerald-600 border-emerald-600 shadow-xs'
+                ? 'bg-emerald-600 border-emerald-600'
                 : 'bg-slate-50 border-emerald-200'
             }`}
             onPress={() => setPayrollFilter('SLIP_DONE')}
@@ -400,7 +400,7 @@ export default function AdminPayrollScreen() {
           <TouchableOpacity
             className={`px-3 py-1.5 rounded-xl border ${
               payrollFilter === 'SLIP_PENDING'
-                ? 'bg-amber-600 border-amber-600 shadow-xs'
+                ? 'bg-amber-600 border-amber-600'
                 : 'bg-slate-50 border-amber-200'
             }`}
             onPress={() => setPayrollFilter('SLIP_PENDING')}
@@ -430,7 +430,7 @@ export default function AdminPayrollScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {/* Executive Financial Summary Banner */}
-          <View className="bg-slate-900 rounded-3xl p-5 mb-5 shadow-sm border border-slate-800">
+          <View className="bg-slate-900 rounded-3xl p-5 mb-5 border border-slate-800">
             <View className="flex-row justify-between items-center mb-3">
               <View className="flex-row items-center">
                 <Wallet size={16} color="#818cf8" />
@@ -513,7 +513,7 @@ export default function AdminPayrollScreen() {
               return (
                 <View
                   key={emp.id}
-                  className="bg-white rounded-2xl p-4 border border-slate-200 mb-3 shadow-xs"
+                  className="bg-white rounded-2xl p-4 border border-slate-200 mb-3"
                 >
                   {/* Top Employee Row */}
                   <View className="flex-row justify-between items-start mb-3">
@@ -588,7 +588,7 @@ export default function AdminPayrollScreen() {
                   <View className="flex-row space-x-2">
                     {!payslip ? (
                       <TouchableOpacity
-                        className="flex-1 flex-row items-center justify-center bg-indigo-600 py-2.5 rounded-xl mr-2 shadow-xs active:bg-indigo-700"
+                        className="flex-1 flex-row items-center justify-center bg-indigo-600 py-2.5 rounded-xl mr-2"
                         onPress={() => handleGeneratePayslip(emp)}
                       >
                         <FileSpreadsheet size={14} color="#ffffff" />
@@ -596,7 +596,7 @@ export default function AdminPayrollScreen() {
                       </TouchableOpacity>
                     ) : (
                       <TouchableOpacity
-                        className="flex-1 flex-row items-center justify-center bg-indigo-50 border border-indigo-200 py-2.5 rounded-xl mr-2 active:bg-indigo-100"
+                        className="flex-1 flex-row items-center justify-center bg-indigo-50 border border-indigo-200 py-2.5 rounded-xl mr-2"
                         disabled={loadingPdfId === payslip.id}
                         onPress={() => handleSharePayslipPdf(payslip)}
                       >
@@ -614,7 +614,7 @@ export default function AdminPayrollScreen() {
                     )}
 
                     <TouchableOpacity
-                      className="flex-1 flex-row items-center justify-center bg-emerald-600 py-2.5 rounded-xl shadow-xs active:bg-emerald-700"
+                      className="flex-1 flex-row items-center justify-center bg-emerald-600 py-2.5 rounded-xl"
                       onPress={() => openPaymentModal(emp)}
                     >
                       <IndianRupee size={14} color="#ffffff" />
@@ -698,7 +698,7 @@ export default function AdminPayrollScreen() {
             <View className="space-y-2">
               {/* Share PDF Button */}
               <TouchableOpacity
-                className="flex-row items-center justify-center bg-indigo-600 py-3.5 px-4 rounded-2xl shadow-sm mb-2 active:bg-indigo-700"
+                className="flex-row items-center justify-center bg-indigo-600 py-3.5 px-4 rounded-2xl mb-2"
                 onPress={handleShareRegisterPdf}
                 disabled={exporting}
               >
@@ -716,7 +716,7 @@ export default function AdminPayrollScreen() {
 
               {/* Save PDF to Phone Button */}
               <TouchableOpacity
-                className="flex-row items-center justify-center bg-sky-600 py-3.5 px-4 rounded-2xl shadow-sm mb-2 active:bg-sky-700"
+                className="flex-row items-center justify-center bg-sky-600 py-3.5 px-4 rounded-2xl mb-2"
                 onPress={handleSaveRegisterPdf}
                 disabled={exporting}
               >
@@ -728,7 +728,7 @@ export default function AdminPayrollScreen() {
 
               {/* Export Excel / CSV Button */}
               <TouchableOpacity
-                className="flex-row items-center justify-center bg-emerald-600 py-3.5 px-4 rounded-2xl shadow-sm active:bg-emerald-700"
+                className="flex-row items-center justify-center bg-emerald-600 py-3.5 px-4 rounded-2xl"
                 onPress={handleExportCsv}
                 disabled={exporting}
               >
@@ -775,7 +775,7 @@ export default function AdminPayrollScreen() {
                   key={mode}
                   className={`flex-1 py-2 items-center rounded-xl border mr-1.5 last:mr-0 ${
                     payMode === mode
-                      ? 'bg-indigo-600 border-indigo-600 shadow-xs'
+                      ? 'bg-indigo-600 border-indigo-600'
                       : 'bg-slate-50 border-slate-300'
                   }`}
                   onPress={() => setPayMode(mode)}
@@ -802,7 +802,7 @@ export default function AdminPayrollScreen() {
             />
 
             <TouchableOpacity
-              className="bg-emerald-600 py-3.5 rounded-xl items-center shadow-xs mb-8"
+              className="bg-emerald-600 py-3.5 rounded-xl items-center mb-8"
               onPress={handleConfirmDisbursal}
               disabled={submittingPay}
             >

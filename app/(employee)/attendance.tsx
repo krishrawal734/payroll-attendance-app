@@ -210,7 +210,7 @@ export default function EmployeeAttendanceScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       {/* Real-time Clock Card */}
-      <View className="bg-slate-900 rounded-3xl p-6 items-center mb-4 shadow-sm">
+      <View className="bg-slate-900 rounded-3xl p-6 items-center mb-4">
         <Text className="text-slate-400 text-xs font-semibold mb-1">
           {now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
         </Text>
@@ -276,8 +276,8 @@ export default function EmployeeAttendanceScreen() {
           <>
             {/* Check In Button */}
             <TouchableOpacity
-              className={`rounded-2xl p-4 flex-row items-center mb-3 shadow-sm ${
-                todayRecord?.checkInTime ? 'bg-slate-400 opacity-60' : 'bg-emerald-600 active:bg-emerald-700'
+              className={`rounded-2xl p-4 flex-row items-center mb-3 ${
+                todayRecord?.checkInTime ? 'bg-slate-400 opacity-60' : 'bg-emerald-600'
               }`}
               disabled={!!todayRecord?.checkInTime}
               onPress={handleCheckIn}
@@ -295,10 +295,10 @@ export default function EmployeeAttendanceScreen() {
 
             {/* Check Out Button */}
             <TouchableOpacity
-              className={`rounded-2xl p-4 flex-row items-center shadow-sm ${
+              className={`rounded-2xl p-4 flex-row items-center ${
                 !todayRecord?.checkInTime || !!todayRecord?.checkOutTime
                   ? 'bg-slate-400 opacity-60'
-                  : 'bg-indigo-600 active:bg-indigo-700'
+                  : 'bg-indigo-600'
               }`}
               disabled={!todayRecord?.checkInTime || !!todayRecord?.checkOutTime}
               onPress={handleCheckOut}
@@ -327,7 +327,7 @@ export default function EmployeeAttendanceScreen() {
           <Text className="text-base font-extrabold text-slate-900">My Attendance Records</Text>
           {history.length > 0 && (
             <TouchableOpacity
-              className="flex-row items-center bg-indigo-600 px-3 py-1.5 rounded-xl shadow-xs"
+              className="flex-row items-center bg-indigo-600 px-3 py-1.5 rounded-xl"
               onPress={handleExportPdf}
               disabled={exporting}
             >
@@ -346,7 +346,7 @@ export default function EmployeeAttendanceScreen() {
           <Text className="text-xs text-slate-400">No attendance records recorded yet.</Text>
         ) : (
           history.map((record) => (
-            <View key={record.id} className="bg-white rounded-2xl p-3.5 border border-slate-200 mb-2.5 shadow-xs">
+            <View key={record.id} className="bg-white rounded-2xl p-3.5 border border-slate-200 mb-2.5">
               <View className="flex-row justify-between items-center mb-2.5">
                 <View className="flex-row items-center">
                   <Calendar size={13} color="#64748b" />

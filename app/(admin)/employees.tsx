@@ -141,7 +141,7 @@ export default function AdminEmployeesScreen() {
           />
         </View>
         <TouchableOpacity
-          className="flex-row items-center bg-indigo-600 px-3.5 py-2 rounded-xl shadow-xs"
+          className="flex-row items-center bg-indigo-600 px-3.5 py-2 rounded-xl"
           onPress={() => setModalVisible(true)}
         >
           <UserPlus size={16} color="#ffffff" />
@@ -179,7 +179,7 @@ export default function AdminEmployeesScreen() {
               return (
                 <TouchableOpacity
                   key={emp.id}
-                  className="bg-white rounded-2xl p-3.5 flex-row items-center justify-between border border-slate-200 mb-2.5 shadow-xs"
+                  className="bg-white rounded-2xl p-3.5 flex-row items-center justify-between border border-slate-200 mb-2.5"
                   activeOpacity={0.7}
                   onPress={() => {
                     router.push({
@@ -281,7 +281,7 @@ export default function AdminEmployeesScreen() {
                   <View className="flex-row bg-slate-100 rounded-xl p-1">
                     <TouchableOpacity
                       className={`flex-1 py-2 items-center rounded-lg ${
-                        salaryType === 'monthly' ? 'bg-white shadow-xs' : ''
+                        salaryType === 'monthly' ? 'bg-white' : ''
                       }`}
                       onPress={() => setSalaryType('monthly')}
                     >
@@ -295,7 +295,7 @@ export default function AdminEmployeesScreen() {
                     </TouchableOpacity>
                     <TouchableOpacity
                       className={`flex-1 py-2 items-center rounded-lg ${
-                        salaryType === 'daily' ? 'bg-white shadow-xs' : ''
+                        salaryType === 'daily' ? 'bg-white' : ''
                       }`}
                       onPress={() => setSalaryType('daily')}
                     >
@@ -320,7 +320,7 @@ export default function AdminEmployeesScreen() {
               />
 
               <TouchableOpacity
-                className="bg-indigo-600 flex-row items-center justify-center py-3.5 rounded-xl shadow-xs mb-8"
+                className="bg-indigo-600 flex-row items-center justify-center py-3.5 rounded-xl mb-8"
                 onPress={handleRegister}
                 disabled={submitting}
               >

@@ -118,7 +118,7 @@ export default function AdminLeavesScreen() {
       <View className="flex-row p-3 bg-white border-b border-slate-200">
         <TouchableOpacity
           className={`flex-1 py-2.5 items-center rounded-xl mr-2 ${
-            tab === 'PENDING' ? 'bg-indigo-50 shadow-xs' : ''
+            tab === 'PENDING' ? 'bg-indigo-50' : ''
           }`}
           onPress={() => setTab('PENDING')}
         >
@@ -133,7 +133,7 @@ export default function AdminLeavesScreen() {
 
         <TouchableOpacity
           className={`flex-1 py-2.5 items-center rounded-xl ${
-            tab === 'HISTORY' ? 'bg-indigo-50 shadow-xs' : ''
+            tab === 'HISTORY' ? 'bg-indigo-50' : ''
           }`}
           onPress={() => setTab('HISTORY')}
         >
@@ -168,7 +168,7 @@ export default function AdminLeavesScreen() {
             </View>
           ) : (
             displayed.map((leave) => (
-              <View key={leave.id} className="bg-white rounded-2xl p-4 border border-slate-200 mb-3 shadow-xs">
+              <View key={leave.id} className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
                 <View className="flex-row justify-between items-start mb-2">
                   <View className="flex-1">
                     <Text className="text-sm font-extrabold text-slate-900">{leave.employeeName}</Text>
@@ -222,7 +222,7 @@ export default function AdminLeavesScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-emerald-600 shadow-xs"
+                      className="flex-1 flex-row items-center justify-center py-2.5 rounded-xl bg-emerald-600"
                       onPress={() => handleApprove(leave)}
                       disabled={actionLoading}
                     >
@@ -267,7 +267,7 @@ export default function AdminLeavesScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                className="bg-rose-600 px-4 py-2 rounded-xl shadow-xs"
+                className="bg-rose-600 px-4 py-2 rounded-xl"
                 onPress={confirmRejection}
                 disabled={actionLoading}
               >

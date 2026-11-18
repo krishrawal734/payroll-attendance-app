@@ -97,7 +97,7 @@ export default function EmployeeDashboard() {
       </View>
 
       {/* Today's Punch Widget */}
-      <View className="bg-slate-900 rounded-3xl p-5 mb-6 shadow-md shadow-slate-300">
+      <View className="bg-slate-900 rounded-3xl p-5 mb-6">
         <View className="flex-row justify-between items-center mb-2.5">
           <View className="flex-row items-center">
             <View
@@ -138,7 +138,7 @@ export default function EmployeeDashboard() {
         )}
 
         <TouchableOpacity
-          className="bg-indigo-600 py-3 rounded-xl flex-row items-center justify-center mt-3 active:bg-indigo-700"
+          className="bg-indigo-600 py-3 rounded-xl flex-row items-center justify-center mt-3"
           activeOpacity={0.8}
           onPress={() => router.push('/(employee)/attendance')}
         >
