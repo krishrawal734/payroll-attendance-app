@@ -4,10 +4,40 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
 import { Payslip, Employee, AttendanceRecord } from '../types';
 
-export function generatePayslipHtml(payslip: Payslip, employee: Employee): string {
+export function generatePayslipHtml(
+  payslip: Payslip,
+  employee: Employee,
+  paidAmount: number = 0
+): string {
   const empCode = `EMP-${employee.id.slice(0, 5).toUpperCase()}`;
   const upiId = employee.bankUpiId || 'Cash Voucher / Bank Transfer';
+
+  // Always compute strictly from verified present days & base salary — never stale math
+  const payableDays =
+    employee.salaryType === 'monthly'
+      ? Math.min(payslip.presentDays, 30)
+      : payslip.presentDays;
+  const baseShiftEarnings =
+    employee.salaryType === 'monthly'
+      ? Math.round((employee.baseSalary / 30) * payableDays)
+      : Math.round(employee.baseSalary * payableDays);
   const nightAllowance = payslip.nightPresentDays * 250;
+  const grossEarnings = baseShiftEarnings + nightAllowance;
+  const advanceDeductions = Math.min(payslip.advanceDeductions || 0, grossEarnings);
+  const netPayable = Math.max(0, grossEarnings - advanceDeductions);
+  const remainingPayable = Math.max(0, netPayable - paidAmount);
+  const liveStatus: 'PAID' | 'PARTIAL' | 'UNPAID' =
+    paidAmount > 0
+      ? paidAmount >= netPayable
+        ? 'PAID'
+        : 'PARTIAL'
+      : payslip.paymentStatus;
+  const badgeClass =
+    liveStatus === 'PAID'
+      ? 'badge-paid'
+      : liveStatus === 'PARTIAL'
+        ? 'badge-partial'
+        : 'badge-pending';
 
   return `
 <!DOCTYPE html>
@@ -41,6 +71,7 @@ export function generatePayslipHtml(payslip: Payslip, employee: Employee): strin
     .footer { margin-top: 35px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 16px; }
     .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 800; }
     .badge-paid { background-color: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-partial { background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
     .badge-pending { background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
     
     .sign-row { display: flex; justify-content: space-between; margin-top: 35px; }
@@ -65,7 +96,7 @@ export function generatePayslipHtml(payslip: Payslip, employee: Employee): strin
       <td class="meta-label">Mobile Number:</td>
       <td>+91 ${employee.mobileNumber}</td>
       <td class="meta-label">Disbursal Status:</td>
-      <td><span class="badge ${payslip.paymentStatus === 'PAID' ? 'badge-paid' : 'badge-pending'}">${payslip.paymentStatus}</span></td>
+      <td><span class="badge ${badgeClass}">${liveStatus}</span></td>
     </tr>
     <tr>
       <td class="meta-label">Salary Model:</td>
@@ -115,14 +146,14 @@ export function generatePayslipHtml(payslip: Payslip, employee: Employee): strin
       <tr>
         <td>
           <strong>Base Shift Earnings</strong><br>
-          <span style="font-size: 10px; color: #64748b;">${employee.salaryType === 'daily' ? `${payslip.presentDays} days × ₹${employee.baseSalary}` : 'Monthly Pro-rated Salary'}</span>
+          <span style="font-size: 10px; color: #64748b;">${employee.salaryType === 'daily' ? `${payslip.presentDays} days × ₹${employee.baseSalary.toLocaleString('en-IN')}` : `${payslip.presentDays} present days × ₹${Math.round(employee.baseSalary / 30).toLocaleString('en-IN')}/day`}</span>
         </td>
-        <td style="text-align: right; font-weight: 700;">₹${(payslip.grossEarnings - nightAllowance).toLocaleString('en-IN')}</td>
+        <td style="text-align: right; font-weight: 700;">₹${baseShiftEarnings.toLocaleString('en-IN')}</td>
         <td>
           <strong>Advance Recovery</strong><br>
           <span style="font-size: 10px; color: #64748b;">Auto-deducted from Passbook Ledger</span>
         </td>
-        <td style="text-align: right; color: #dc2626; font-weight: 700;">- ₹${payslip.advanceDeductions.toLocaleString('en-IN')}</td>
+        <td style="text-align: right; color: #dc2626; font-weight: 700;">- ₹${advanceDeductions.toLocaleString('en-IN')}</td>
       </tr>
       <tr>
         <td>
@@ -138,14 +169,28 @@ export function generatePayslipHtml(payslip: Payslip, employee: Employee): strin
       </tr>
       <tr style="background-color: #f8fafc;">
         <td><strong>TOTAL GROSS EARNINGS</strong></td>
-        <td style="text-align: right; font-weight: 900; color: #0f172a;">₹${payslip.grossEarnings.toLocaleString('en-IN')}</td>
+        <td style="text-align: right; font-weight: 900; color: #0f172a;">₹${grossEarnings.toLocaleString('en-IN')}</td>
         <td><strong>TOTAL DEDUCTIONS</strong></td>
-        <td style="text-align: right; font-weight: 900; color: #dc2626;">- ₹${payslip.advanceDeductions.toLocaleString('en-IN')}</td>
+        <td style="text-align: right; font-weight: 900; color: #dc2626;">- ₹${advanceDeductions.toLocaleString('en-IN')}</td>
       </tr>
       <tr class="total-row">
         <td colspan="3" style="text-align: right; font-size: 14px;">NET TAKE-HOME PAYABLE:</td>
-        <td style="text-align: right; font-size: 18px; font-weight: 900; color: #15803d;">₹${payslip.netPayable.toLocaleString('en-IN')}</td>
+        <td style="text-align: right; font-size: 18px; font-weight: 900; color: #15803d;">₹${netPayable.toLocaleString('en-IN')}</td>
       </tr>
+      ${
+        paidAmount > 0
+          ? `
+      <tr style="background-color: #f8fafc;">
+        <td colspan="3" style="text-align: right; font-size: 12px; font-weight: 700; color: #4338ca;">SALARY ALREADY PAID (${payslip.monthYear}):</td>
+        <td style="text-align: right; font-size: 13px; font-weight: 800; color: #4338ca;">- ₹${paidAmount.toLocaleString('en-IN')}</td>
+      </tr>
+      <tr style="background-color: #ecfdf5;">
+        <td colspan="3" style="text-align: right; font-size: 13px; font-weight: 900; color: #065f46;">REMAINING BALANCE TO PAY:</td>
+        <td style="text-align: right; font-size: 16px; font-weight: 900; color: #047857;">₹${remainingPayable.toLocaleString('en-IN')}</td>
+      </tr>
+      `
+          : ''
+      }
     </tbody>
   </table>
 
@@ -170,8 +215,12 @@ export function generatePayslipHtml(payslip: Payslip, employee: Employee): strin
 }
 
 // 1. Direct Share (WhatsApp, Email, Telegram, Google Drive, Files)
-export async function sharePayslipDirectly(payslip: Payslip, employee: Employee) {
-  const html = generatePayslipHtml(payslip, employee);
+export async function sharePayslipDirectly(
+  payslip: Payslip,
+  employee: Employee,
+  paidAmount: number = 0
+) {
+  const html = generatePayslipHtml(payslip, employee, paidAmount);
   try {
     const { uri } = await Print.printToFileAsync({ html });
 
@@ -222,9 +271,13 @@ export async function sharePayslipDirectly(payslip: Payslip, employee: Employee)
 }
 
 // 2. Direct Save to Phone (Android "Save as PDF" spooler)
-export async function savePayslipToPhone(payslip: Payslip, employee: Employee) {
+export async function savePayslipToPhone(
+  payslip: Payslip,
+  employee: Employee,
+  paidAmount: number = 0
+) {
   try {
-    const html = generatePayslipHtml(payslip, employee);
+    const html = generatePayslipHtml(payslip, employee, paidAmount);
     await Print.printAsync({ html });
     return { success: true };
   } catch (err: any) {
@@ -289,7 +342,8 @@ export function promptPayslipOptions(
   Alert.alert(
     'Payslip Action',
     `Payslip for ${employee.fullName} (${payslip.monthYear})`,
-    actions
+    actions,
+    { cancelable: true }
   );
 }
 
@@ -919,14 +973,20 @@ export function generatePayrollRegisterHtml(
       const payslip = payslips.find((p) => p.employeeId === emp.id && p.monthYear === monthYear);
       const empCode = `EMP-${emp.id.slice(0, 5).toUpperCase()}`;
 
-      const presentDays = payslip?.presentDays ?? (fin?.presentDays || 0);
-      const nightShifts = payslip?.nightPresentDays ?? (fin?.nightPresentDays || 0);
+      const presentDays = fin ? fin.presentDays : (payslip?.presentDays || 0);
+      const nightShifts = fin ? fin.nightPresentDays : (payslip?.nightPresentDays || 0);
       const nightBonus = nightShifts * 250;
-      const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
+      const gross = fin ? fin.estimatedCurrentEarnings : (payslip?.grossEarnings || 0);
       const activeAdv = fin?.activeAdvanceBalance || 0;
-      const advanceDeduction = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
-      const net = payslip?.netPayable ?? Math.max(0, gross - advanceDeduction);
-      const status = payslip?.paymentStatus || (net <= 0 ? 'PAID' : 'PENDING DISBURSAL');
+      const advanceDeduction = fin ? fin.advanceDeduction : (payslip?.advanceDeductions ?? Math.min(activeAdv, gross));
+      const net = fin ? (fin.netPayableForMonth ?? Math.max(0, gross - advanceDeduction)) : (payslip?.netPayable ?? Math.max(0, gross - advanceDeduction));
+      const paidThisMonth = fin?.salaryPaidForMonth || 0;
+      const status =
+        paidThisMonth > 0
+          ? paidThisMonth >= net
+            ? 'PAID'
+            : 'PARTIAL'
+          : payslip?.paymentStatus || (net <= 0 ? 'PAID' : 'PENDING DISBURSAL');
 
       totalGross += gross;
       totalNightBonuses += nightBonus;

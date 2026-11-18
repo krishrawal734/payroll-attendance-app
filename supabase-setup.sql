@@ -49,9 +49,13 @@ CREATE POLICY "Allow insert salary_transactions" ON public.salary_transactions F
 -- PAYSLIPS POLICIES
 DROP POLICY IF EXISTS "Allow select payslips" ON public.payslips;
 DROP POLICY IF EXISTS "Allow insert payslips" ON public.payslips;
+DROP POLICY IF EXISTS "Allow update payslips" ON public.payslips;
+DROP POLICY IF EXISTS "Allow delete payslips" ON public.payslips;
 DROP POLICY IF EXISTS "Allow read own payslips or admin all" ON public.payslips;
 CREATE POLICY "Allow select payslips" ON public.payslips FOR SELECT USING (true);
 CREATE POLICY "Allow insert payslips" ON public.payslips FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow update payslips" ON public.payslips FOR UPDATE USING (true);
+CREATE POLICY "Allow delete payslips" ON public.payslips FOR DELETE USING (true);
 
 -- 2. INSERT INITIAL SEED ACCOUNTS
 INSERT INTO public.employees (mobile_number, full_name, role, designation, base_salary, salary_type, bank_upi_id)

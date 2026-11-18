@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import { useAuth } from '../../src/store/authContext';
 import { dataService } from '../../src/services/dataService';
-import { shareOrPrintPayslip, promptPayslipOptions } from '../../src/services/pdfService';
+import { sharePayslipDirectly, savePayslipToPhone } from '../../src/services/pdfService';
+import { syncPayslipWithLiveData } from '../../src/services/payrollCalculations';
+import PayslipActionModal from '../../src/components/PayslipActionModal';
 import { Payslip, SalaryTransaction } from '../../src/types';
 import {
   FileText,
@@ -27,6 +29,8 @@ export default function EmployeePayslipsScreen() {
   const [transactions, setTransactions] = useState<SalaryTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(null);
+  const [selectedPaidAmount, setSelectedPaidAmount] = useState(0);
 
   const loadData = async () => {
     if (!user) return;
@@ -36,8 +40,17 @@ export default function EmployeePayslipsScreen() {
         dataService.getPayslips(user.id),
         dataService.getTransactions(user.id),
       ]);
+
+      // Sync every payslip with live verified attendance & ledger calculations
+      const liveSlips = await Promise.all(
+        slips.map(async (slip) => {
+          const slipFin = await dataService.getEmployeeFinancialSummary(user.id, slip.monthYear);
+          return syncPayslipWithLiveData(slip, slipFin);
+        })
+      );
+
       setFinSummary(fin);
-      setPayslips(slips);
+      setPayslips(liveSlips);
       setTransactions(txs);
     } catch (err) {
       console.error('Failed to load payslips:', err);
@@ -58,45 +71,79 @@ export default function EmployeePayslipsScreen() {
 
   if (!user) return null;
 
-  const handleSharePayslip = async (payslip: Payslip) => {
-    promptPayslipOptions(
-      payslip,
-      user,
-      () => setDownloadingId(payslip.id),
-      () => setDownloadingId(null)
-    );
+  const handleSharePayslip = (payslip: Payslip, paidAmt: number) => {
+    setSelectedPayslip(payslip);
+    setSelectedPaidAmount(paidAmt);
+  };
+
+  const handleShareDirectly = async () => {
+    if (!selectedPayslip || !user) return;
+    setDownloadingId(selectedPayslip.id);
+    const res = await sharePayslipDirectly(selectedPayslip, user, selectedPaidAmount);
+    setDownloadingId(null);
+    setSelectedPayslip(null);
+    if (!res.success && res.error) {
+      Alert.alert('Notice', res.error);
+    }
+  };
+
+  const handleSaveToPhone = async () => {
+    if (!selectedPayslip || !user) return;
+    setDownloadingId(selectedPayslip.id);
+    const res = await savePayslipToPhone(selectedPayslip, user, selectedPaidAmount);
+    setDownloadingId(null);
+    setSelectedPayslip(null);
+    if (!res.success && res.error) {
+      Alert.alert('Notice', res.error);
+    }
   };
 
   return (
-    <ScrollView
-      className="flex-1 bg-slate-50"
-      contentContainerClassName="p-4 pb-12"
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
+    <View className="flex-1 bg-slate-50">
+      <ScrollView
+        className="flex-1 bg-slate-50"
+        contentContainerClassName="p-4 pb-12"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
       {/* Financial Standing Banner */}
       <View className="bg-indigo-950 rounded-3xl p-6 mb-5">
         <Text className="text-indigo-300 text-xs font-bold uppercase tracking-wider">
-          Current Financial Standing
+          Remaining to Pay (This Month)
         </Text>
-        <Text className="text-white text-3xl font-black mt-1.5">
-          ₹{(finSummary?.estimatedCurrentEarnings || 0).toLocaleString()}
+        <Text className="text-emerald-400 text-3xl font-black mt-1.5">
+          ₹{(finSummary?.pendingPayable || 0).toLocaleString()}
         </Text>
-        <Text className="text-indigo-200 text-xs mt-0.5">Estimated Month-to-Date Earnings</Text>
+        <Text className="text-indigo-200 text-xs mt-0.5">
+          Balance remaining after advance &amp; paid salary
+        </Text>
 
-        <View className="flex-row mt-4 pt-4 border-t border-indigo-900/80">
-          <View className="flex-1">
-            <Text className="text-[11px] text-indigo-300">Active Advance Due</Text>
-            <Text className="text-base font-black text-rose-400 mt-0.5">
-              - ₹{(finSummary?.activeAdvanceBalance || 0).toLocaleString()}
+        <View className="mt-4 pt-4 border-t border-indigo-900">
+          <View className="flex-row justify-between items-center mb-2">
+            <Text className="text-xs text-indigo-300">Gross Earned (This Month)</Text>
+            <Text className="text-xs font-extrabold text-white">
+              ₹{(finSummary?.estimatedCurrentEarnings || 0).toLocaleString()}
             </Text>
           </View>
-          <View className="w-px bg-indigo-900 mx-4" />
-          <View className="flex-1">
-            <Text className="text-[11px] text-indigo-300">Est. Net Take-Home</Text>
-            <Text className="text-base font-black text-emerald-400 mt-0.5">
-              ₹{(finSummary?.pendingPayable || 0).toLocaleString()}
+          <View className="flex-row justify-between items-center mb-2">
+            <Text className="text-xs text-indigo-300">Advance Taken (From Salary)</Text>
+            <Text className="text-xs font-extrabold text-rose-400">
+              - ₹{(finSummary?.advanceDeduction || 0).toLocaleString()}
             </Text>
           </View>
+          <View className="flex-row justify-between items-center mb-2">
+            <Text className="text-xs text-indigo-300">Salary Paid (This Month)</Text>
+            <Text className="text-xs font-extrabold text-sky-300">
+              - ₹{(finSummary?.salaryPaidForMonth || 0).toLocaleString()}
+            </Text>
+          </View>
+          {(finSummary?.activeAdvanceBalance || 0) > (finSummary?.advanceDeduction || 0) && (
+            <View className="flex-row justify-between items-center pt-2 border-t border-indigo-900">
+              <Text className="text-[11px] text-amber-300">Extra Advance Due (Carry Forward)</Text>
+              <Text className="text-xs font-extrabold text-amber-300">
+                ₹{((finSummary?.activeAdvanceBalance || 0) - (finSummary?.advanceDeduction || 0)).toLocaleString()}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -113,7 +160,19 @@ export default function EmployeePayslipsScreen() {
           <Text className="text-xs text-slate-400 mt-1.5">No payslips generated for this period yet.</Text>
         </View>
       ) : (
-        payslips.map((ps) => (
+        payslips.map((ps) => {
+          const paidForSlip = transactions
+            .filter(
+              (t) =>
+                t.type === 'SALARY_PAYMENT' &&
+                ((t.notes && t.notes.includes(ps.monthYear)) ||
+                  (t.paymentDate && t.paymentDate.startsWith(ps.monthYear)))
+            )
+            .reduce((sum, t) => sum + t.amount, 0);
+          const remainingForSlip =
+            ps.paymentStatus === 'PAID' ? 0 : Math.max(0, ps.netPayable - paidForSlip);
+
+          return (
           <View key={ps.id} className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
             <View className="flex-row justify-between items-start mb-2.5">
               <View>
@@ -151,16 +210,35 @@ export default function EmployeePayslipsScreen() {
             </View>
 
             {/* Financial Details */}
+            <View className="bg-slate-50 rounded-xl p-2.5 mb-3 border border-slate-100">
+              <View className="flex-row justify-between mb-1">
+                <Text className="text-[11px] text-slate-500 font-medium">Gross Earned</Text>
+                <Text className="text-[11px] text-slate-900 font-bold">₹{ps.grossEarnings.toLocaleString()}</Text>
+              </View>
+              <View className="flex-row justify-between mb-1">
+                <Text className="text-[11px] text-rose-500 font-medium">Advance Taken (Deducted)</Text>
+                <Text className="text-[11px] text-rose-600 font-bold">- ₹{ps.advanceDeductions.toLocaleString()}</Text>
+              </View>
+              <View className="flex-row justify-between">
+                <Text className="text-[11px] text-indigo-600 font-medium">Salary Paid</Text>
+                <Text className="text-[11px] text-indigo-700 font-bold">- ₹{paidForSlip.toLocaleString()}</Text>
+              </View>
+            </View>
+
             <View className="flex-row justify-between items-center pt-2 border-t border-slate-100">
               <View>
-                <Text className="text-[10px] text-slate-500 font-bold uppercase">Net Take-Home</Text>
-                <Text className="text-base font-black text-slate-900">₹{ps.netPayable.toLocaleString()}</Text>
+                <Text className="text-[10px] text-slate-500 font-bold uppercase">
+                  {ps.paymentStatus === 'PAID' ? 'Settled (Paid)' : 'Remaining to Pay'}
+                </Text>
+                <Text className="text-base font-black text-emerald-700">
+                  ₹{remainingForSlip.toLocaleString()}
+                </Text>
               </View>
 
               <TouchableOpacity
                 className="bg-indigo-600 flex-row items-center px-3.5 py-2 rounded-xl"
                 disabled={downloadingId === ps.id}
-                onPress={() => handleSharePayslip(ps)}
+                onPress={() => handleSharePayslip(ps, paidForSlip)}
               >
                 {downloadingId === ps.id ? (
                   <ActivityIndicator size="small" color="#ffffff" />
@@ -173,7 +251,8 @@ export default function EmployeePayslipsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        ))
+          );
+        })
       )}
 
       {/* Salary & Advance Payment History */}
@@ -221,6 +300,17 @@ export default function EmployeePayslipsScreen() {
           ))
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+
+      <PayslipActionModal
+        visible={selectedPayslip !== null}
+        payslip={selectedPayslip}
+        employee={user}
+        paidAmount={selectedPaidAmount}
+        onClose={() => setSelectedPayslip(null)}
+        onShareDirectly={handleShareDirectly}
+        onSaveToPhone={handleSaveToPhone}
+      />
+    </View>
   );
 }

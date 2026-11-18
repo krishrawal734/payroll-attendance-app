@@ -99,4 +99,7 @@ export interface EmployeeFinancialSummary {
   estimatedCurrentEarnings: number;
   advanceDeduction: number;
   pendingPayable: number;
+  salaryPaidForMonth?: number;
+  netPayableForMonth?: number;
+  advanceTakenForMonth?: number;
 }

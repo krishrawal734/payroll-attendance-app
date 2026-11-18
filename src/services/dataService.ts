@@ -8,6 +8,7 @@ import {
   SalaryTransaction,
   Payslip,
   AttendanceLocation,
+  PaymentMode,
 } from '../types';
 
 export class DataService {
@@ -126,6 +127,22 @@ export class DataService {
     }
     const res = db.recordTransaction(tx);
     return { success: res.success, message: res.message };
+  }
+
+  async settleSalaryPayment(params: {
+    employeeId: string;
+    employeeName: string;
+    monthYear: string;
+    amount: number;
+    paymentMode: PaymentMode;
+    referenceId?: string;
+    paymentDate: string;
+    notes?: string;
+  }): Promise<{ success: boolean; paymentStatus?: 'PAID' | 'PARTIAL'; advanceRecovered?: number; message: string }> {
+    if (this.isCloud()) {
+      return await supabaseService.settleSalaryPayment(params);
+    }
+    return db.settleSalaryPayment(params);
   }
 
   async getEmployeeFinancialSummary(employeeId: string, monthYear?: string) {

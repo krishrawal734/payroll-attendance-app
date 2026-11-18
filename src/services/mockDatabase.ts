@@ -6,7 +6,12 @@ import {
   Payslip,
   AttendanceLocation,
   EmployeeFinancialSummary,
+  PaymentMode,
 } from '../types';
+import {
+  computeEmployeeMonthlyPayroll,
+  getAdvanceRecoveryNote,
+} from './payrollCalculations';
 
 class MockDatabase {
   private employees: Employee[] = [];
@@ -203,58 +208,13 @@ class MockDatabase {
     const emp = this.getEmployeeById(employeeId);
     if (!emp) return null;
 
-    const txs = this.getTransactions(employeeId);
-
-    // Total advance paid to this employee
-    const totalAdvancesTaken = txs
-      .filter((t) => t.type === 'ADVANCE_PAID')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    // Total deductions recovered against advances
-    const totalAdvancesRecovered = txs
-      .filter((t) => t.type === 'DEDUCTION')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const activeAdvanceBalance = Math.max(0, totalAdvancesTaken - totalAdvancesRecovered);
-
-    // Total salary disbursed historically
-    const totalSalaryPaid = txs
-      .filter((t) => t.type === 'SALARY_PAYMENT')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    // Month attendance count
-    const targetMonth = monthYear || new Date().toISOString().slice(0, 7); // e.g. "2026-11"
-    const empAttendance = this.getAttendance(employeeId).filter((a) => a.date.startsWith(targetMonth));
-    const presentDays = empAttendance.filter((a) => a.status === 'PRESENT').length;
-    const nightPresentDays = empAttendance.filter((a) => a.isNightPresent).length;
-    const leaves = this.getLeaves(employeeId).filter(
-      (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(targetMonth) || l.toDate.startsWith(targetMonth))
+    return computeEmployeeMonthlyPayroll(
+      emp,
+      this.getAttendance(employeeId),
+      this.getLeaves(employeeId),
+      this.getTransactions(employeeId),
+      monthYear
     );
-
-    const nightAllowance = nightPresentDays * 250;
-    const payableDays = Math.min(presentDays + leaves.length, 30);
-    const baseEarnings = emp.salaryType === 'monthly'
-      ? Math.round((emp.baseSalary / 30) * payableDays)
-      : Math.round(emp.baseSalary * presentDays);
-
-    const estimatedCurrentEarnings = baseEarnings + nightAllowance;
-    const advanceDeduction = Math.min(activeAdvanceBalance, estimatedCurrentEarnings);
-    const pendingPayable = Math.max(0, estimatedCurrentEarnings - advanceDeduction);
-
-    return {
-      baseSalary: emp.baseSalary,
-      salaryType: emp.salaryType,
-      activeAdvanceBalance,
-      totalAdvancesTaken,
-      totalSalaryPaid,
-      presentDays,
-      nightPresentDays,
-      nightAllowance,
-      baseEarnings,
-      estimatedCurrentEarnings,
-      advanceDeduction,
-      pendingPayable,
-    };
   }
 
   // --- Payslips ---
@@ -269,36 +229,36 @@ class MockDatabase {
     const emp = this.getEmployeeById(employeeId);
     if (!emp) return { success: false, message: 'Employee not found.' };
 
-    const empAttendance = this.getAttendance(employeeId).filter((a) => a.date.startsWith(monthYear));
-    const presentDays = empAttendance.filter((a) => a.status === 'PRESENT').length;
-    const nightPresentDays = empAttendance.filter((a) => a.isNightPresent).length;
-    const leaves = this.getLeaves(employeeId).filter(
-      (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(monthYear) || l.toDate.startsWith(monthYear))
+    const calc = computeEmployeeMonthlyPayroll(
+      emp,
+      this.getAttendance(employeeId),
+      this.getLeaves(employeeId),
+      this.getTransactions(employeeId),
+      monthYear
     );
 
-    const nightAllowance = nightPresentDays * 250;
-    const payableDays = Math.min(presentDays + leaves.length, 30);
-    const baseEarnings = emp.salaryType === 'monthly'
-      ? Math.round((emp.baseSalary / 30) * payableDays)
-      : Math.round(emp.baseSalary * presentDays);
-    const gross = baseEarnings + nightAllowance;
-
-    // Deduct active advances accurately (capped at gross)
-    const finSummary = this.getEmployeeFinancialSummary(employeeId, monthYear);
-    const advanceDeduction = Math.min(finSummary?.activeAdvanceBalance || 0, gross);
-    const net = Math.max(0, gross - advanceDeduction);
+    const gross = calc.estimatedCurrentEarnings;
+    const advanceDeduction = calc.advanceDeduction;
+    const net = calc.netPayableForMonth;
+    const paymentStatus: 'PAID' | 'PARTIAL' | 'UNPAID' =
+      calc.salaryPaidForMonth > 0
+        ? calc.salaryPaidForMonth >= net
+          ? 'PAID'
+          : 'PARTIAL'
+        : 'UNPAID';
 
     const existingIdx = this.payslips.findIndex((p) => p.employeeId === employeeId && p.monthYear === monthYear);
     if (existingIdx !== -1) {
       this.payslips[existingIdx] = {
         ...this.payslips[existingIdx],
-        presentDays,
-        nightPresentDays,
-        leavesTaken: leaves.length,
+        presentDays: calc.presentDays,
+        nightPresentDays: calc.nightPresentDays,
+        leavesTaken: calc.leavesTaken,
         baseSalary: emp.baseSalary,
         grossEarnings: gross,
         advanceDeductions: advanceDeduction,
         netPayable: net,
+        paymentStatus,
       };
       return {
         success: true,
@@ -313,19 +273,90 @@ class MockDatabase {
       employeeName: emp.fullName,
       monthYear,
       totalDays: 30,
-      presentDays,
-      nightPresentDays,
-      leavesTaken: leaves.length,
+      presentDays: calc.presentDays,
+      nightPresentDays: calc.nightPresentDays,
+      leavesTaken: calc.leavesTaken,
       baseSalary: emp.baseSalary,
       grossEarnings: gross,
       advanceDeductions: advanceDeduction,
       netPayable: net,
-      paymentStatus: 'UNPAID',
+      paymentStatus,
       generatedAt: new Date().toISOString(),
     };
 
     this.payslips.unshift(newPayslip);
     return { success: true, payslip: newPayslip, message: `Payslip for ${monthYear} generated successfully.` };
+  }
+
+  settleSalaryPayment(params: {
+    employeeId: string;
+    employeeName: string;
+    monthYear: string;
+    amount: number;
+    paymentMode: PaymentMode;
+    referenceId?: string;
+    paymentDate: string;
+    notes?: string;
+  }): { success: boolean; paymentStatus?: 'PAID' | 'PARTIAL'; advanceRecovered?: number; message: string } {
+    const emp = this.getEmployeeById(params.employeeId);
+    if (!emp) return { success: false, message: 'Employee not found.' };
+
+    const calcBefore = computeEmployeeMonthlyPayroll(
+      emp,
+      this.getAttendance(params.employeeId),
+      this.getLeaves(params.employeeId),
+      this.getTransactions(params.employeeId),
+      params.monthYear
+    );
+
+    this.recordTransaction({
+      employeeId: params.employeeId,
+      employeeName: params.employeeName,
+      type: 'SALARY_PAYMENT',
+      amount: params.amount,
+      paymentMode: params.paymentMode,
+      referenceId: params.referenceId,
+      paymentDate: params.paymentDate,
+      notes: params.notes || `Salary disbursal for ${params.monthYear} via ${params.paymentMode}`,
+    });
+
+    let advanceRecovered = 0;
+    if (calcBefore.additionalAdvanceToRecover > 0) {
+      this.recordTransaction({
+        employeeId: params.employeeId,
+        employeeName: params.employeeName,
+        type: 'DEDUCTION',
+        amount: calcBefore.additionalAdvanceToRecover,
+        paymentMode: params.paymentMode,
+        referenceId: params.referenceId,
+        paymentDate: params.paymentDate,
+        notes: getAdvanceRecoveryNote(params.monthYear),
+      });
+      advanceRecovered = calcBefore.additionalAdvanceToRecover;
+    }
+
+    const totalPaidForMonth = calcBefore.salaryPaidForMonth + params.amount;
+    const slipIdx = this.payslips.findIndex(
+      (p) => p.employeeId === params.employeeId && p.monthYear === params.monthYear
+    );
+    const targetNet = slipIdx !== -1 ? this.payslips[slipIdx].netPayable : calcBefore.netPayableForMonth;
+    const newStatus: 'PAID' | 'PARTIAL' = totalPaidForMonth >= targetNet ? 'PAID' : 'PARTIAL';
+
+    if (slipIdx !== -1) {
+      this.payslips[slipIdx] = { ...this.payslips[slipIdx], paymentStatus: newStatus };
+    }
+
+    const advNote =
+      advanceRecovered > 0
+        ? ` Advance of ₹${advanceRecovered.toLocaleString()} settled in passbook.`
+        : '';
+
+    return {
+      success: true,
+      paymentStatus: newStatus,
+      advanceRecovered,
+      message: `₹${params.amount.toLocaleString()} salary recorded (${newStatus}).${advNote}`,
+    };
   }
 
   deletePayslip(id: string): { success: boolean; message: string } {

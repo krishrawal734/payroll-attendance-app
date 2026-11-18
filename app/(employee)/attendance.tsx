@@ -99,7 +99,8 @@ export default function EmployeeAttendanceScreen() {
           text: 'Cancel',
           style: 'cancel',
         },
-      ]
+      ],
+      { cancelable: true }
     );
   };
 

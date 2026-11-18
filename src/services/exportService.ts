@@ -190,15 +190,21 @@ export class ExportService {
       const rows = staff.map((emp) => {
         const fin = summaries[emp.id];
         const payslip = payslips.find((p) => p.employeeId === emp.id && p.monthYear === monthYear);
-        const presentDays = payslip?.presentDays ?? (fin?.presentDays || 0);
-        const nightShifts = payslip?.nightPresentDays ?? (fin?.nightPresentDays || 0);
+        const presentDays = fin ? fin.presentDays : (payslip?.presentDays || 0);
+        const nightShifts = fin ? fin.nightPresentDays : (payslip?.nightPresentDays || 0);
         const nightBonus = nightShifts * 250;
-        const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
-        const baseShiftEarnings = gross - nightBonus;
+        const gross = fin ? fin.estimatedCurrentEarnings : (payslip?.grossEarnings || 0);
+        const baseShiftEarnings = Math.max(0, gross - nightBonus);
         const activeAdv = fin?.activeAdvanceBalance || 0;
-        const advanceDeduction = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
-        const net = payslip?.netPayable ?? Math.max(0, gross - advanceDeduction);
-        const status = payslip?.paymentStatus || (net <= 0 ? 'PAID' : 'PENDING DISBURSAL');
+        const advanceDeduction = fin ? fin.advanceDeduction : (payslip?.advanceDeductions ?? Math.min(activeAdv, gross));
+        const net = fin ? (fin.netPayableForMonth ?? Math.max(0, gross - advanceDeduction)) : (payslip?.netPayable ?? Math.max(0, gross - advanceDeduction));
+        const paidThisMonth = fin?.salaryPaidForMonth || 0;
+        const status =
+          paidThisMonth > 0
+            ? paidThisMonth >= net
+              ? 'PAID'
+              : 'PARTIAL'
+            : payslip?.paymentStatus || (net <= 0 ? 'PAID' : 'PENDING DISBURSAL');
 
         return [
           this.escapeCsv(emp.fullName),

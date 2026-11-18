@@ -238,7 +238,12 @@ export default function AdminLeavesScreen() {
       )}
 
       {/* Rejection Remark Modal */}
-      <Modal visible={rejectModalVisible} transparent animationType="fade">
+      <Modal
+        visible={rejectModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRejectModalVisible(false)}
+      >
         <View className="flex-1 bg-black/50 justify-center items-center p-5">
           <View className="w-full bg-white rounded-3xl p-5">
             <View className="flex-row justify-between items-center mb-3">

@@ -203,20 +203,29 @@ export default function EmployeeDashboard() {
         </View>
 
         <View className="flex-row justify-between py-2 border-b border-slate-100">
-          <Text className="text-xs text-slate-500">Base Monthly Salary</Text>
-          <Text className="text-xs font-bold text-slate-900">₹{user.baseSalary.toLocaleString()}</Text>
-        </View>
-
-        <View className="flex-row justify-between py-2 border-b border-slate-100">
-          <Text className="text-xs text-slate-500">Active Advance Due</Text>
-          <Text className="text-xs font-bold text-rose-500">
-            - ₹{(finSummary?.activeAdvanceBalance || 0).toLocaleString()}
+          <Text className="text-xs text-slate-500">Gross Earned (This Month)</Text>
+          <Text className="text-xs font-bold text-slate-900">
+            ₹{(finSummary?.estimatedCurrentEarnings || 0).toLocaleString()}
           </Text>
         </View>
 
-        <View className="flex-row justify-between py-2 px-2 bg-slate-50 rounded-lg mt-1">
-          <Text className="text-xs font-bold text-slate-900">Est. Net Take-Home</Text>
-          <Text className="text-sm font-black text-emerald-600">
+        <View className="flex-row justify-between py-2 border-b border-slate-100">
+          <Text className="text-xs text-slate-500">Advance Taken (From Salary)</Text>
+          <Text className="text-xs font-bold text-rose-500">
+            - ₹{(finSummary?.advanceDeduction || 0).toLocaleString()}
+          </Text>
+        </View>
+
+        <View className="flex-row justify-between py-2 border-b border-slate-100">
+          <Text className="text-xs text-slate-500">Salary Paid (This Month)</Text>
+          <Text className="text-xs font-bold text-indigo-600">
+            - ₹{(finSummary?.salaryPaidForMonth || 0).toLocaleString()}
+          </Text>
+        </View>
+
+        <View className="flex-row justify-between py-2.5 px-2.5 bg-emerald-50 border border-emerald-200 rounded-xl mt-2">
+          <Text className="text-xs font-extrabold text-slate-900">Remaining to Pay</Text>
+          <Text className="text-sm font-black text-emerald-700">
             ₹{(finSummary?.pendingPayable || 0).toLocaleString()}
           </Text>
         </View>

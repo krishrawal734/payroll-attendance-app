@@ -281,29 +281,29 @@ export default function EmployeeDetailScreen() {
       {/* Financial Health & Advance Passbook */}
       <View className="bg-indigo-950 rounded-3xl p-5 mb-5">
         <Text className="text-indigo-300 text-[10px] font-black uppercase tracking-wider">
-          EMPLOYEE PASSBOOK
+          EMPLOYEE PASSBOOK (THIS MONTH)
         </Text>
 
-        <View className="flex-row my-3.5 space-x-3">
-          {/* Active Advance Due */}
+        <View className="flex-row my-3.5">
+          {/* Advance Taken from Salary */}
           <View className="flex-1 mr-2">
-            <Text className="text-indigo-200 text-xs">Active Advance Due</Text>
+            <Text className="text-indigo-200 text-xs">Advance Taken</Text>
             <Text className="text-2xl font-black text-rose-400 mt-0.5">
-              ₹{(fin?.activeAdvanceBalance || 0).toLocaleString()}
+              ₹{(fin?.advanceDeduction || 0).toLocaleString()}
             </Text>
             <Text className="text-indigo-400 text-[10px] mt-0.5">
-              Total Taken: ₹{(fin?.totalAdvancesTaken || 0).toLocaleString()}
+              Active Due: ₹{(fin?.activeAdvanceBalance || 0).toLocaleString()} • Total: ₹{(fin?.totalAdvancesTaken || 0).toLocaleString()}
             </Text>
           </View>
 
-          {/* Pending Salary */}
+          {/* Remaining to Pay */}
           <View className="flex-1">
-            <Text className="text-indigo-200 text-xs">Pending Take-Home</Text>
+            <Text className="text-indigo-200 text-xs">Remaining to Pay</Text>
             <Text className="text-2xl font-black text-emerald-400 mt-0.5">
               ₹{(fin?.pendingPayable || 0).toLocaleString()}
             </Text>
             <Text className="text-indigo-400 text-[10px] mt-0.5">
-              Earned: ₹{(fin?.estimatedCurrentEarnings || 0).toLocaleString()}
+              Gross: ₹{(fin?.estimatedCurrentEarnings || 0).toLocaleString()} • Paid: ₹{(fin?.salaryPaidForMonth || 0).toLocaleString()}
             </Text>
           </View>
         </View>
@@ -374,7 +374,12 @@ export default function EmployeeDetailScreen() {
       )}
 
       {/* Payment / Advance Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalVisible(false)}
+      >
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-3xl p-5 max-h-[85%]">
             <View className="flex-row justify-between items-center mb-4 pb-2 border-b border-slate-100">

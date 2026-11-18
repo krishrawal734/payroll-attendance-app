@@ -1,6 +1,10 @@
 import { supabase } from './supabaseClient';
 import { db } from './mockDatabase';
 import {
+  computeEmployeeMonthlyPayroll,
+  getAdvanceRecoveryNote,
+} from './payrollCalculations';
+import {
   Employee,
   AttendanceRecord,
   LeaveRequest,
@@ -8,6 +12,7 @@ import {
   Payslip,
   AttendanceLocation,
   EmployeeFinancialSummary,
+  PaymentMode,
 } from '../types';
 
 export class SupabaseService {
@@ -465,54 +470,13 @@ export class SupabaseService {
       return db.getEmployeeFinancialSummary(employeeId, monthYear);
     }
 
-    const txs = await this.getTransactions(employeeId);
+    const [txs, attendance, leaves] = await Promise.all([
+      this.getTransactions(employeeId),
+      this.getAttendance(employeeId),
+      this.getLeaves(employeeId),
+    ]);
 
-    const totalAdvancesTaken = txs
-      .filter((t) => t.type === 'ADVANCE_PAID')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const totalAdvancesRecovered = txs
-      .filter((t) => t.type === 'DEDUCTION')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const activeAdvanceBalance = Math.max(0, totalAdvancesTaken - totalAdvancesRecovered);
-
-    const totalSalaryPaid = txs
-      .filter((t) => t.type === 'SALARY_PAYMENT')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const targetMonth = monthYear || new Date().toISOString().slice(0, 7);
-    const attendance = (await this.getAttendance(employeeId)).filter((a) => a.date.startsWith(targetMonth));
-    const presentDays = attendance.filter((a) => a.status === 'PRESENT').length;
-    const nightPresentDays = attendance.filter((a) => a.isNightPresent).length;
-    const leaves = (await this.getLeaves(employeeId)).filter(
-      (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(targetMonth) || l.toDate.startsWith(targetMonth))
-    );
-
-    const nightAllowance = nightPresentDays * 250;
-    const payableDays = Math.min(presentDays + leaves.length, 30);
-    const baseEarnings = emp.salaryType === 'monthly'
-      ? Math.round((emp.baseSalary / 30) * payableDays)
-      : Math.round(emp.baseSalary * presentDays);
-
-    const estimatedCurrentEarnings = baseEarnings + nightAllowance;
-    const advanceDeduction = Math.min(activeAdvanceBalance, estimatedCurrentEarnings);
-    const pendingPayable = Math.max(0, estimatedCurrentEarnings - advanceDeduction);
-
-    return {
-      baseSalary: emp.baseSalary,
-      salaryType: emp.salaryType,
-      activeAdvanceBalance,
-      totalAdvancesTaken,
-      totalSalaryPaid,
-      presentDays,
-      nightPresentDays,
-      nightAllowance,
-      baseEarnings,
-      estimatedCurrentEarnings,
-      advanceDeduction,
-      pendingPayable,
-    };
+    return computeEmployeeMonthlyPayroll(emp, attendance, leaves, txs, monthYear);
   }
 
   // --- Payslips ---
@@ -531,7 +495,7 @@ export class SupabaseService {
       employeeName: d.employee_name,
       monthYear: d.month_year,
       totalDays: d.total_days,
-      presentDays: d.present_days,
+      presentDays: Number(d.present_days),
       nightPresentDays: d.night_present_days,
       leavesTaken: d.leaves_taken,
       baseSalary: Number(d.base_salary),
@@ -551,23 +515,22 @@ export class SupabaseService {
       return db.generatePayslip(employeeId, monthYear);
     }
 
-    const attendance = (await this.getAttendance(employeeId)).filter((a) => a.date.startsWith(monthYear));
-    const presentDays = attendance.filter((a) => a.status === 'PRESENT').length;
-    const nightPresentDays = attendance.filter((a) => a.isNightPresent).length;
-    const leaves = (await this.getLeaves(employeeId)).filter(
-      (l) => l.status === 'APPROVED' && (l.fromDate.startsWith(monthYear) || l.toDate.startsWith(monthYear))
-    );
+    const [txs, attendance, leaves] = await Promise.all([
+      this.getTransactions(employeeId),
+      this.getAttendance(employeeId),
+      this.getLeaves(employeeId),
+    ]);
 
-    const nightAllowance = nightPresentDays * 250;
-    const payableDays = Math.min(presentDays + leaves.length, 30);
-    const baseEarnings = emp.salaryType === 'monthly'
-      ? Math.round((emp.baseSalary / 30) * payableDays)
-      : Math.round(emp.baseSalary * presentDays);
-    const gross = baseEarnings + nightAllowance;
-
-    const finSummary = await this.getEmployeeFinancialSummary(employeeId, monthYear);
-    const advanceDeduction = Math.min(finSummary?.activeAdvanceBalance || 0, gross);
-    const net = Math.max(0, gross - advanceDeduction);
+    const calc = computeEmployeeMonthlyPayroll(emp, attendance, leaves, txs, monthYear);
+    const gross = calc.estimatedCurrentEarnings;
+    const advanceDeduction = calc.advanceDeduction;
+    const net = calc.netPayableForMonth;
+    const paymentStatus: 'PAID' | 'PARTIAL' | 'UNPAID' =
+      calc.salaryPaidForMonth > 0
+        ? calc.salaryPaidForMonth >= net
+          ? 'PAID'
+          : 'PARTIAL'
+        : 'UNPAID';
 
     const { data: existing } = await supabase
       .from('payslips')
@@ -581,13 +544,14 @@ export class SupabaseService {
       const { data, error } = await supabase
         .from('payslips')
         .update({
-          present_days: presentDays,
-          night_present_days: nightPresentDays,
-          leaves_taken: leaves.length,
+          present_days: calc.presentDays,
+          night_present_days: calc.nightPresentDays,
+          leaves_taken: calc.leavesTaken,
           base_salary: emp.baseSalary,
           gross_earnings: gross,
           advance_deductions: advanceDeduction,
           net_payable: net,
+          payment_status: paymentStatus,
         })
         .eq('id', existing.id)
         .select()
@@ -605,7 +569,7 @@ export class SupabaseService {
           employeeName: data.employee_name,
           monthYear: data.month_year,
           totalDays: data.total_days,
-          presentDays: data.present_days,
+          presentDays: Number(data.present_days),
           nightPresentDays: data.night_present_days,
           leavesTaken: data.leaves_taken,
           baseSalary: Number(data.base_salary),
@@ -627,14 +591,14 @@ export class SupabaseService {
           employee_name: emp.fullName,
           month_year: monthYear,
           total_days: 30,
-          present_days: presentDays,
-          night_present_days: nightPresentDays,
-          leaves_taken: leaves.length,
+          present_days: calc.presentDays,
+          night_present_days: calc.nightPresentDays,
+          leaves_taken: calc.leavesTaken,
           base_salary: emp.baseSalary,
           gross_earnings: gross,
           advance_deductions: advanceDeduction,
           net_payable: net,
-          payment_status: 'UNPAID',
+          payment_status: paymentStatus,
         },
       ])
       .select()
@@ -652,7 +616,7 @@ export class SupabaseService {
         employeeName: data.employee_name,
         monthYear: data.month_year,
         totalDays: data.total_days,
-        presentDays: data.present_days,
+        presentDays: Number(data.present_days),
         nightPresentDays: data.night_present_days,
         leavesTaken: data.leaves_taken,
         baseSalary: Number(data.base_salary),
@@ -663,6 +627,102 @@ export class SupabaseService {
         generatedAt: data.generated_at,
       },
       message: `Payslip for ${monthYear} generated and saved to Supabase!`,
+    };
+  }
+
+  /**
+   * Records a salary disbursal, automatically settles any active advance deduction
+   * for that month (without ever double-deducting), and updates the payslip status
+   * to PAID or PARTIAL.
+   */
+  async settleSalaryPayment(params: {
+    employeeId: string;
+    employeeName: string;
+    monthYear: string;
+    amount: number;
+    paymentMode: PaymentMode;
+    referenceId?: string;
+    paymentDate: string;
+    notes?: string;
+  }): Promise<{ success: boolean; paymentStatus?: 'PAID' | 'PARTIAL'; advanceRecovered?: number; message: string }> {
+    if (!this.isUUID(params.employeeId)) {
+      return db.settleSalaryPayment(params);
+    }
+
+    const emp = await this.getEmployeeById(params.employeeId);
+    if (!emp) return { success: false, message: 'Employee not found.' };
+
+    // Snapshot pre-payment calculation to know exact remaining advance recovery for this month
+    const [txsBefore, attendance, leaves] = await Promise.all([
+      this.getTransactions(params.employeeId),
+      this.getAttendance(params.employeeId),
+      this.getLeaves(params.employeeId),
+    ]);
+    const calcBefore = computeEmployeeMonthlyPayroll(emp, attendance, leaves, txsBefore, params.monthYear);
+
+    // 1. Record SALARY_PAYMENT transaction
+    const payRes = await this.recordTransaction({
+      employeeId: params.employeeId,
+      employeeName: params.employeeName,
+      type: 'SALARY_PAYMENT',
+      amount: params.amount,
+      paymentMode: params.paymentMode,
+      referenceId: params.referenceId,
+      paymentDate: params.paymentDate,
+      notes: params.notes || `Salary disbursal for ${params.monthYear} via ${params.paymentMode}`,
+    });
+
+    if (!payRes.success) {
+      return { success: false, message: payRes.message };
+    }
+
+    // 2. Auto-settle any unrecovered advance deduction for this month (never double-deducts)
+    let advanceRecovered = 0;
+    if (calcBefore.additionalAdvanceToRecover > 0) {
+      const dedRes = await this.recordTransaction({
+        employeeId: params.employeeId,
+        employeeName: params.employeeName,
+        type: 'DEDUCTION',
+        amount: calcBefore.additionalAdvanceToRecover,
+        paymentMode: params.paymentMode,
+        referenceId: params.referenceId,
+        paymentDate: params.paymentDate,
+        notes: getAdvanceRecoveryNote(params.monthYear),
+      });
+      if (dedRes.success) {
+        advanceRecovered = calcBefore.additionalAdvanceToRecover;
+      }
+    }
+
+    // 3. Recompute total paid for the month and update payslip status (PAID or PARTIAL)
+    const totalPaidForMonth = calcBefore.salaryPaidForMonth + params.amount;
+    const { data: existingSlip } = await supabase
+      .from('payslips')
+      .select('*')
+      .eq('employee_id', params.employeeId)
+      .eq('month_year', params.monthYear)
+      .maybeSingle();
+
+    const targetNet = existingSlip ? Number(existingSlip.net_payable) : calcBefore.netPayableForMonth;
+    const newStatus: 'PAID' | 'PARTIAL' = totalPaidForMonth >= targetNet ? 'PAID' : 'PARTIAL';
+
+    if (existingSlip) {
+      await supabase
+        .from('payslips')
+        .update({ payment_status: newStatus })
+        .eq('id', existingSlip.id);
+    }
+
+    const advNote =
+      advanceRecovered > 0
+        ? ` Advance of ₹${advanceRecovered.toLocaleString()} settled in passbook.`
+        : '';
+
+    return {
+      success: true,
+      paymentStatus: newStatus,
+      advanceRecovered,
+      message: `₹${params.amount.toLocaleString()} salary recorded (${newStatus}).${advNote}`,
     };
   }
 

@@ -12,11 +12,16 @@ import {
 } from 'react-native';
 import { dataService } from '../../src/services/dataService';
 import {
-  shareOrPrintPayslip,
-  promptPayslipOptions,
+  sharePayslipDirectly,
+  savePayslipToPhone,
   sharePayrollRegisterPdf,
   savePayrollRegisterPdfToPhone,
 } from '../../src/services/pdfService';
+import {
+  syncPayslipWithLiveData,
+  computeLivePaymentStatus,
+} from '../../src/services/payrollCalculations';
+import PayslipActionModal from '../../src/components/PayslipActionModal';
 import { exportService } from '../../src/services/exportService';
 import { Employee, Payslip, PaymentMode } from '../../src/types';
 import {
@@ -54,6 +59,8 @@ export default function AdminPayrollScreen() {
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [actionPayslip, setActionPayslip] = useState<Payslip | null>(null);
+  const [actionEmployee, setActionEmployee] = useState<Employee | null>(null);
 
   // Quick Payment Recording State
   const [payAmount, setPayAmount] = useState('');
@@ -101,30 +108,35 @@ export default function AdminPayrollScreen() {
 
   const staff = employees.filter((e) => e.role === 'employee');
 
-  // Compute Grand Financial Totals for Executive Banner
+  // Compute Grand Financial Totals for Executive Banner (ALWAYS from live verified attendance & ledger)
+  let totalBaseEarnings = 0;
   let totalGross = 0;
   let totalNight = 0;
   let totalAdvRec = 0;
   let totalActiveAdv = 0;
+  let totalPaidThisMonth = 0;
   let totalNet = 0;
+  let totalRemainingToPay = 0;
 
   staff.forEach((emp) => {
     const fin = summaries[emp.id];
-    const payslip = allPayslips.find(
-      (p) => p.employeeId === emp.id && p.monthYear === selectedMonth
-    );
-    const gross = payslip ? payslip.grossEarnings : (fin?.estimatedCurrentEarnings || 0);
-    const nightShifts = payslip ? payslip.nightPresentDays : (fin?.nightPresentDays || 0);
-    const night = nightShifts * 250;
+    const baseEarn = fin?.baseEarnings || 0;
+    const night = fin?.nightAllowance || 0;
+    const gross = fin?.estimatedCurrentEarnings || 0;
     const active = fin?.activeAdvanceBalance || 0;
-    const advRec = payslip ? payslip.advanceDeductions : Math.min(active, gross);
-    const net = payslip ? payslip.netPayable : Math.max(0, gross - advRec);
+    const advRec = fin?.advanceDeduction || 0;
+    const net = fin?.netPayableForMonth ?? Math.max(0, gross - advRec);
+    const paid = fin?.salaryPaidForMonth || 0;
+    const remaining = Math.max(0, net - paid);
 
+    totalBaseEarnings += baseEarn;
     totalGross += gross;
     totalNight += night;
     totalAdvRec += advRec;
     totalActiveAdv += active;
+    totalPaidThisMonth += paid;
     totalNet += net;
+    totalRemainingToPay += remaining;
   });
 
   // Filter staff based on tabs & search
@@ -192,56 +204,87 @@ export default function AdminPayrollScreen() {
   };
 
   const handleSharePayslipPdf = async (ps: Payslip) => {
-    const emp = await dataService.getEmployeeById(ps.employeeId);
+    const emp = employees.find((e) => e.id === ps.employeeId) || (await dataService.getEmployeeById(ps.employeeId));
     if (!emp) return;
+    const fin = summaries[emp.id];
+    setActionPayslip(syncPayslipWithLiveData(ps, fin));
+    setActionEmployee(emp);
+  };
 
-    promptPayslipOptions(
-      ps,
-      emp,
-      () => setLoadingPdfId(ps.id),
-      () => setLoadingPdfId(null),
-      async () => {
-        const res = await dataService.generatePayslip(emp.id, selectedMonth);
-        Alert.alert(res.success ? 'Payslip Recalculated' : 'Notice', res.message);
-        if (res.success) {
-          await loadData(selectedMonth);
-        }
-      },
-      async () => {
-        Alert.alert(
-          'Delete Payslip',
-          `Delete payslip for ${emp.fullName}? Status will reset back to Pending Slip.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Delete',
-              style: 'destructive',
-              onPress: async () => {
-                const res = await dataService.deletePayslip(ps.id);
-                if (res.success) {
-                  await loadData(selectedMonth);
-                } else {
-                  Alert.alert('Error', res.message);
-                }
-              },
-            },
-          ]
-        );
-      }
+  const handleClosePayslipAction = () => {
+    setActionPayslip(null);
+    setActionEmployee(null);
+  };
+
+  const handlePayslipShareDirectly = async () => {
+    if (!actionPayslip || !actionEmployee) return;
+    const paidForEmp = summaries[actionEmployee.id]?.salaryPaidForMonth || 0;
+    setLoadingPdfId(actionPayslip.id);
+    const res = await sharePayslipDirectly(actionPayslip, actionEmployee, paidForEmp);
+    setLoadingPdfId(null);
+    handleClosePayslipAction();
+    if (!res.success && res.error) {
+      Alert.alert('Notice', res.error);
+    }
+  };
+
+  const handlePayslipSaveToPhone = async () => {
+    if (!actionPayslip || !actionEmployee) return;
+    const paidForEmp = summaries[actionEmployee.id]?.salaryPaidForMonth || 0;
+    setLoadingPdfId(actionPayslip.id);
+    const res = await savePayslipToPhone(actionPayslip, actionEmployee, paidForEmp);
+    setLoadingPdfId(null);
+    handleClosePayslipAction();
+    if (!res.success && res.error) {
+      Alert.alert('Notice', res.error);
+    }
+  };
+
+  const handlePayslipRecalculate = async () => {
+    if (!actionEmployee) return;
+    const res = await dataService.generatePayslip(actionEmployee.id, selectedMonth);
+    handleClosePayslipAction();
+    Alert.alert(res.success ? 'Payslip Recalculated' : 'Notice', res.message);
+    if (res.success) {
+      await loadData(selectedMonth);
+    }
+  };
+
+  const handlePayslipDelete = () => {
+    if (!actionPayslip || !actionEmployee) return;
+    const targetSlip = actionPayslip;
+    const targetEmp = actionEmployee;
+    Alert.alert(
+      'Delete Payslip',
+      `Delete payslip for ${targetEmp.fullName}? Status will reset back to Pending Slip.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await dataService.deletePayslip(targetSlip.id);
+            if (res.success) {
+              await loadData(selectedMonth);
+            } else {
+              Alert.alert('Error', res.message);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
     );
   };
 
   const openPaymentModal = (emp: Employee) => {
     setSelectedEmp(emp);
     const fin = summaries[emp.id];
-    const payslip = allPayslips.find(
-      (p) => p.employeeId === emp.id && p.monthYear === selectedMonth
-    );
-    const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
-    const activeAdv = fin?.activeAdvanceBalance || 0;
-    const advRec = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
-    const payable = payslip?.netPayable ?? Math.max(0, gross - advRec);
-    setPayAmount(String(payable));
+    const gross = fin?.estimatedCurrentEarnings || 0;
+    const advRec = fin?.advanceDeduction || 0;
+    const netTotal = fin?.netPayableForMonth ?? Math.max(0, gross - advRec);
+    const alreadyPaid = fin?.salaryPaidForMonth || 0;
+    const remaining = Math.max(0, netTotal - alreadyPaid);
+    setPayAmount(String(remaining));
     setPaymentModalVisible(true);
   };
 
@@ -254,10 +297,10 @@ export default function AdminPayrollScreen() {
     }
 
     setSubmittingPay(true);
-    const res = await dataService.recordTransaction({
+    const res = await dataService.settleSalaryPayment({
       employeeId: selectedEmp.id,
       employeeName: selectedEmp.fullName,
-      type: 'SALARY_PAYMENT',
+      monthYear: selectedMonth,
       amount: val,
       paymentMode: payMode,
       referenceId: payRef.trim() || undefined,
@@ -268,6 +311,7 @@ export default function AdminPayrollScreen() {
 
     if (res.success) {
       Alert.alert('Payment Recorded', res.message);
+      setPayRef('');
       setPaymentModalVisible(false);
       await loadData(selectedMonth);
     } else {
@@ -443,36 +487,50 @@ export default function AdminPayrollScreen() {
               </View>
             </View>
 
-            {/* Net Payout Prominent Header */}
-            <View className="mb-4">
-              <Text className="text-slate-400 text-xs">Total Net Disbursable Take-Home</Text>
-              <Text className="text-white text-3xl font-black mt-0.5">
-                ₹{totalNet.toLocaleString('en-IN')}
-              </Text>
-            </View>
-
-            {/* 4-Item Breakdown Grid */}
-            <View className="grid grid-cols-2 gap-2 bg-slate-800/60 rounded-2xl p-3 border border-slate-700/60">
-              <View className="flex-row justify-between items-center pb-2 border-b border-slate-700/60">
-                <Text className="text-slate-400 text-xs">Gross Earnings</Text>
-                <Text className="text-white text-xs font-extrabold">
-                  ₹{totalGross.toLocaleString('en-IN')}
+            {/* Remaining to Pay Prominent Header */}
+            <View className="flex-row justify-between items-end mb-4">
+              <View>
+                <Text className="text-slate-400 text-xs">Total Remaining to Pay</Text>
+                <Text className="text-white text-3xl font-black mt-0.5">
+                  ₹{totalRemainingToPay.toLocaleString('en-IN')}
                 </Text>
               </View>
+              <View className="items-end">
+                <Text className="text-slate-400 text-[10px] font-bold uppercase">Paid ({selectedMonth})</Text>
+                <Text className="text-emerald-400 text-sm font-black mt-0.5">
+                  ₹{totalPaidThisMonth.toLocaleString('en-IN')}
+                </Text>
+              </View>
+            </View>
+
+            {/* Step-by-step Exact Breakdown */}
+            <View className="bg-slate-800/60 rounded-2xl p-3 border border-slate-700/60">
               <View className="flex-row justify-between items-center pb-2 border-b border-slate-700/60">
-                <Text className="text-purple-300 text-xs">Night Allowances</Text>
+                <Text className="text-slate-400 text-xs">Base Shift Earnings</Text>
+                <Text className="text-white text-xs font-extrabold">
+                  ₹{totalBaseEarnings.toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <View className="flex-row justify-between items-center py-2 border-b border-slate-700/60">
+                <Text className="text-purple-300 text-xs">Night Allowances (+₹250/shift)</Text>
                 <Text className="text-purple-300 text-xs font-extrabold">
                   + ₹{totalNight.toLocaleString('en-IN')}
                 </Text>
               </View>
-              <View className="flex-row justify-between items-center pt-2">
-                <Text className="text-rose-400 text-xs">Advance Deductions</Text>
+              <View className="flex-row justify-between items-center py-2 border-b border-slate-700/60">
+                <Text className="text-slate-200 text-xs font-bold">Total Gross Earned</Text>
+                <Text className="text-white text-xs font-black">
+                  ₹{totalGross.toLocaleString('en-IN')}
+                </Text>
+              </View>
+              <View className="flex-row justify-between items-center py-2 border-b border-slate-700/60">
+                <Text className="text-rose-400 text-xs">Advance Taken (Deducted)</Text>
                 <Text className="text-rose-400 text-xs font-extrabold">
                   - ₹{totalAdvRec.toLocaleString('en-IN')}
                 </Text>
               </View>
               <View className="flex-row justify-between items-center pt-2">
-                <Text className="text-amber-400 text-xs">Active Advances Due</Text>
+                <Text className="text-amber-400 text-xs">Total Active Advance Balance</Text>
                 <Text className="text-amber-400 text-xs font-extrabold">
                   ₹{totalActiveAdv.toLocaleString('en-IN')}
                 </Text>
@@ -502,13 +560,19 @@ export default function AdminPayrollScreen() {
                 (p) => p.employeeId === emp.id && p.monthYear === selectedMonth
               );
 
-              const presentDays = payslip?.presentDays ?? (fin?.presentDays || 0);
-              const nightShifts = payslip?.nightPresentDays ?? (fin?.nightPresentDays || 0);
+              // ALWAYS use live verified calculations from attendance & ledger (never stale stored rows)
+              const presentDays = fin?.presentDays || 0;
+              const nightShifts = fin?.nightPresentDays || 0;
               const activeAdv = fin?.activeAdvanceBalance || 0;
-              const gross = payslip?.grossEarnings ?? (fin?.estimatedCurrentEarnings || 0);
-              const advRec = payslip?.advanceDeductions ?? Math.min(activeAdv, gross);
-              const netPayable = payslip?.netPayable ?? Math.max(0, gross - advRec);
-              const isPaid = payslip?.paymentStatus === 'PAID';
+              const gross = fin?.estimatedCurrentEarnings || 0;
+              const advRec = fin?.advanceDeduction || 0;
+              const netPayable = fin?.netPayableForMonth ?? Math.max(0, gross - advRec);
+              const paidThisMonth = fin?.salaryPaidForMonth || 0;
+              const remainingToPay = Math.max(0, netPayable - paidThisMonth);
+              const extraAdvanceCarry = Math.max(0, activeAdv - advRec);
+              const liveStatus = computeLivePaymentStatus(netPayable, paidThisMonth);
+              const isPaid = liveStatus === 'PAID';
+              const isPartial = liveStatus === 'PARTIAL';
 
               return (
                 <View
@@ -534,10 +598,29 @@ export default function AdminPayrollScreen() {
                     </View>
 
                     {payslip ? (
-                      <View className="flex-row items-center bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        <CheckCircle2 size={11} color="#059669" />
-                        <Text className="text-[10px] font-bold text-emerald-700 ml-1">
-                          {isPaid ? 'Paid' : 'Slip Ready'}
+                      <View
+                        className={`flex-row items-center px-2 py-0.5 rounded-full border ${
+                          isPaid
+                            ? 'bg-emerald-50 border-emerald-200'
+                            : isPartial
+                              ? 'bg-sky-50 border-sky-200'
+                              : 'bg-indigo-50 border-indigo-200'
+                        }`}
+                      >
+                        <CheckCircle2
+                          size={11}
+                          color={isPaid ? '#059669' : isPartial ? '#0284c7' : '#4f46e5'}
+                        />
+                        <Text
+                          className={`text-[10px] font-bold ml-1 ${
+                            isPaid
+                              ? 'text-emerald-700'
+                              : isPartial
+                                ? 'text-sky-700'
+                                : 'text-indigo-700'
+                          }`}
+                        >
+                          {isPaid ? 'Paid' : isPartial ? 'Partial' : 'Slip Ready'}
                         </Text>
                       </View>
                     ) : (
@@ -556,8 +639,8 @@ export default function AdminPayrollScreen() {
                     </Text>
                   </View>
 
-                  {/* 4-Item Financial Metrics Grid */}
-                  <View className="flex-row bg-slate-50 rounded-2xl p-2.5 mb-3.5 border border-slate-100">
+                  {/* Attendance & Gross Metrics Row */}
+                  <View className="flex-row bg-slate-50 rounded-2xl p-2.5 mb-2.5 border border-slate-100">
                     <View className="flex-1 items-center border-r border-slate-200">
                       <Text className="text-[10px] font-bold text-slate-500 uppercase">Present Days</Text>
                       <Text className="text-xs font-black text-slate-900 mt-0.5">
@@ -570,16 +653,56 @@ export default function AdminPayrollScreen() {
                         {nightShifts} (+₹{nightShifts * 250})
                       </Text>
                     </View>
-                    <View className="flex-1 items-center border-r border-slate-200">
-                      <Text className="text-[10px] font-bold text-rose-500 uppercase">Advance Due</Text>
-                      <Text className="text-xs font-black text-rose-500 mt-0.5">
-                        - ₹{activeAdv.toLocaleString()}
+                    <View className="flex-1 items-center">
+                      <Text className="text-[10px] font-bold text-slate-500 uppercase">Gross Earned</Text>
+                      <Text className="text-xs font-black text-slate-900 mt-0.5">
+                        ₹{gross.toLocaleString()}
                       </Text>
                     </View>
-                    <View className="flex-1 items-center">
-                      <Text className="text-[10px] font-bold text-emerald-600 uppercase">Net Payable</Text>
-                      <Text className="text-xs font-black text-emerald-600 mt-0.5">
-                        ₹{netPayable.toLocaleString()}
+                  </View>
+
+                  {/* Advance Taken & Remaining to Pay Breakdown */}
+                  <View className="bg-slate-50 rounded-2xl p-3 mb-3.5 border border-slate-200">
+                    <View className="flex-row justify-between items-center mb-1.5">
+                      <Text className="text-[11px] font-semibold text-slate-600">
+                        Advance Taken (From Salary)
+                      </Text>
+                      <Text className="text-xs font-extrabold text-rose-600">
+                        {advRec > 0 ? `- ₹${advRec.toLocaleString()}` : '₹0'}
+                      </Text>
+                    </View>
+
+                    {extraAdvanceCarry > 0 && (
+                      <View className="flex-row justify-between items-center mb-1.5">
+                        <Text className="text-[10px] font-semibold text-amber-700">
+                          Extra Advance Balance (Carry Forward)
+                        </Text>
+                        <Text className="text-[11px] font-extrabold text-amber-700">
+                          ₹{extraAdvanceCarry.toLocaleString()}
+                        </Text>
+                      </View>
+                    )}
+
+                    <View className="flex-row justify-between items-center mb-2">
+                      <Text className="text-[11px] font-semibold text-slate-600">
+                        Salary Paid ({selectedMonth})
+                      </Text>
+                      <Text className="text-xs font-extrabold text-indigo-700">
+                        {paidThisMonth > 0 ? `- ₹${paidThisMonth.toLocaleString()}` : '₹0'}
+                      </Text>
+                    </View>
+
+                    <View className="flex-row justify-between items-center pt-2 border-t border-slate-200">
+                      <Text className="text-xs font-black text-slate-900">
+                        Remaining to Pay
+                      </Text>
+                      <Text
+                        className={`text-sm font-black ${
+                          remainingToPay > 0 ? 'text-emerald-700' : 'text-slate-500'
+                        }`}
+                      >
+                        ₹{remainingToPay.toLocaleString()}
+                        {remainingToPay === 0 && paidThisMonth > 0 ? ' (Settled)' : ''}
                       </Text>
                     </View>
                   </View>
@@ -743,7 +866,12 @@ export default function AdminPayrollScreen() {
       </Modal>
 
       {/* Disbursal Payment Modal */}
-      <Modal visible={paymentModalVisible} transparent animationType="slide">
+      <Modal
+        visible={paymentModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPaymentModalVisible(false)}
+      >
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-3xl p-5 max-h-[80%]">
             <View className="flex-row justify-between items-center mb-3 pb-2 border-b border-slate-100">
@@ -759,6 +887,36 @@ export default function AdminPayrollScreen() {
                 <X size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
+
+            {/* Clear Advance & Remaining Balance Summary inside Payment Modal */}
+            {selectedEmp && (() => {
+              const selFin = summaries[selectedEmp.id];
+              const selGross = selFin?.estimatedCurrentEarnings || 0;
+              const selAdv = selFin?.advanceDeduction || 0;
+              const selPaid = selFin?.salaryPaidForMonth || 0;
+              const selNet = selFin?.netPayableForMonth ?? Math.max(0, selGross - selAdv);
+              const selRem = Math.max(0, selNet - selPaid);
+              return (
+                <View className="bg-slate-50 rounded-2xl p-3 border border-slate-200 mb-3.5">
+                  <View className="flex-row justify-between mb-1">
+                    <Text className="text-[11px] text-slate-600 font-semibold">Gross Earned ({selectedMonth})</Text>
+                    <Text className="text-[11px] text-slate-900 font-extrabold">₹{selGross.toLocaleString()}</Text>
+                  </View>
+                  <View className="flex-row justify-between mb-1">
+                    <Text className="text-[11px] text-rose-600 font-semibold">Advance Taken (From Salary)</Text>
+                    <Text className="text-[11px] text-rose-600 font-extrabold">- ₹{selAdv.toLocaleString()}</Text>
+                  </View>
+                  <View className="flex-row justify-between mb-1.5">
+                    <Text className="text-[11px] text-indigo-700 font-semibold">Already Paid ({selectedMonth})</Text>
+                    <Text className="text-[11px] text-indigo-700 font-extrabold">- ₹{selPaid.toLocaleString()}</Text>
+                  </View>
+                  <View className="flex-row justify-between pt-1.5 border-t border-slate-200">
+                    <Text className="text-xs text-slate-900 font-black">Remaining to Pay</Text>
+                    <Text className="text-xs text-emerald-700 font-black">₹{selRem.toLocaleString()}</Text>
+                  </View>
+                </View>
+              );
+            })()}
 
             <Text className="text-xs font-bold text-slate-600 mb-1">Disbursal Amount (₹) *</Text>
             <TextInput
@@ -815,6 +973,19 @@ export default function AdminPayrollScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Payslip Actions Bottom Sheet Modal */}
+      <PayslipActionModal
+        visible={actionPayslip !== null && actionEmployee !== null}
+        payslip={actionPayslip}
+        employee={actionEmployee}
+        paidAmount={actionEmployee ? (summaries[actionEmployee.id]?.salaryPaidForMonth || 0) : 0}
+        onClose={handleClosePayslipAction}
+        onShareDirectly={handlePayslipShareDirectly}
+        onSaveToPhone={handlePayslipSaveToPhone}
+        onRecalculate={handlePayslipRecalculate}
+        onDelete={handlePayslipDelete}
+      />
     </View>
   );
 }

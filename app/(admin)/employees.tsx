@@ -228,7 +228,12 @@ export default function AdminEmployeesScreen() {
       )}
 
       {/* Registration Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalVisible(false)}
+      >
         <View className="flex-1 bg-black/50 justify-end">
           <View className="bg-white rounded-t-3xl p-5 max-h-[85%]">
             <View className="flex-row justify-between items-center mb-4 pb-3 border-b border-slate-100">
