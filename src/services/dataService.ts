@@ -129,6 +129,13 @@ export class DataService {
     return { success: res.success, message: res.message };
   }
 
+  async deleteTransaction(id: string): Promise<{ success: boolean; message: string }> {
+    if (this.isCloud()) {
+      return await supabaseService.deleteTransaction(id);
+    }
+    return db.deleteTransaction(id);
+  }
+
   async settleSalaryPayment(params: {
     employeeId: string;
     employeeName: string;

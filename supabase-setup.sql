@@ -43,8 +43,10 @@ CREATE POLICY "Allow update leave_requests" ON public.leave_requests FOR UPDATE 
 -- SALARY TRANSACTIONS POLICIES
 DROP POLICY IF EXISTS "Allow select salary_transactions" ON public.salary_transactions;
 DROP POLICY IF EXISTS "Allow insert salary_transactions" ON public.salary_transactions;
+DROP POLICY IF EXISTS "Allow delete salary_transactions" ON public.salary_transactions;
 CREATE POLICY "Allow select salary_transactions" ON public.salary_transactions FOR SELECT USING (true);
 CREATE POLICY "Allow insert salary_transactions" ON public.salary_transactions FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow delete salary_transactions" ON public.salary_transactions FOR DELETE USING (true);
 
 -- PAYSLIPS POLICIES
 DROP POLICY IF EXISTS "Allow select payslips" ON public.payslips;

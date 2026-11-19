@@ -558,6 +558,17 @@ export class SupabaseService {
     return { success: true, message: 'Transaction recorded in cloud ledger.' };
   }
 
+  async deleteTransaction(id: string): Promise<{ success: boolean; message: string }> {
+    if (!this.isUUID(id)) {
+      return db.deleteTransaction(id);
+    }
+    const { error } = await supabase.from('salary_transactions').delete().eq('id', id);
+    if (error) {
+      return { success: false, message: error.message || 'Failed to delete transaction' };
+    }
+    return { success: true, message: 'Transaction removed from ledger.' };
+  }
+
   // --- Financial Summary ---
   async getEmployeeFinancialSummary(employeeId: string, monthYear?: string): Promise<EmployeeFinancialSummary | null> {
     const emp = await this.getEmployeeById(employeeId);

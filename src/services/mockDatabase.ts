@@ -244,6 +244,15 @@ class MockDatabase {
     return { success: true, transaction: newTx, message: 'Transaction recorded successfully.' };
   }
 
+  deleteTransaction(id: string): { success: boolean; message: string } {
+    const idx = this.transactions.findIndex((t) => t.id === id);
+    if (idx === -1) {
+      return { success: false, message: 'Transaction not found.' };
+    }
+    this.transactions.splice(idx, 1);
+    return { success: true, message: 'Transaction removed from ledger.' };
+  }
+
   // Calculate Advance Balance, Pending Salary, and Totals for an employee
   getEmployeeFinancialSummary(employeeId: string, monthYear?: string): EmployeeFinancialSummary | null {
     const emp = this.getEmployeeById(employeeId);

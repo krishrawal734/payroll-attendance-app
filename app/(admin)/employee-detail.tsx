@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   ShieldCheck,
   RotateCcw,
+  Trash2,
 } from 'lucide-react-native';
 
 export default function EmployeeDetailScreen() {
@@ -160,6 +161,29 @@ export default function EmployeeDetailScreen() {
             setResetting2fa(false);
             if (res.success) {
               Alert.alert('Authenticator Reset', res.message);
+              await loadData();
+            } else {
+              Alert.alert('Error', res.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteTransaction = (txId: string, amt: number, type: string) => {
+    Alert.alert(
+      'Delete Transaction',
+      `Delete this ${type === 'ADVANCE_PAID' ? 'advance' : 'salary payment'} of ₹${amt.toLocaleString()}? This will update the passbook and monthly payroll ledger.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await dataService.deleteTransaction(txId);
+            if (res.success) {
+              Alert.alert('Deleted', res.message);
               await loadData();
             } else {
               Alert.alert('Error', res.message);
@@ -362,13 +386,21 @@ export default function EmployeeDetailScreen() {
               </View>
             </View>
 
-            <Text
-              className={`text-sm font-black ${
-                tx.type === 'ADVANCE_PAID' ? 'text-rose-500' : 'text-emerald-600'
-              }`}
-            >
-              {tx.type === 'ADVANCE_PAID' ? '+' : ''}₹{tx.amount.toLocaleString()}
-            </Text>
+            <View className="flex-row items-center">
+              <Text
+                className={`text-sm font-black mr-2.5 ${
+                  tx.type === 'ADVANCE_PAID' ? 'text-rose-500' : 'text-emerald-600'
+                }`}
+              >
+                {tx.type === 'ADVANCE_PAID' ? '+' : ''}₹{tx.amount.toLocaleString()}
+              </Text>
+              <TouchableOpacity
+                onPress={() => handleDeleteTransaction(tx.id, tx.amount, tx.type)}
+                className="w-7 h-7 rounded-lg bg-slate-100 items-center justify-center border border-slate-200"
+              >
+                <Trash2 size={13} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
           </View>
         ))
       )}
